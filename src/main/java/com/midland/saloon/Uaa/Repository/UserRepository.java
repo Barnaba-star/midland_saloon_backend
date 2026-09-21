@@ -1,0 +1,132 @@
+package com.midland.saloon.Uaa.Repository;
+
+import com.midland.saloon.Uaa.Model.User;
+import com.midland.saloon.Uaa.Projection.UserProjection;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface UserRepository extends JpaRepository<User, String> {
+
+    @Query("SELECT COUNT(u) > 0 FROM User u WHERE u.username = :username")
+    Boolean existByUsername(@Param("username") String username);
+
+    @Query("SELECT u FROM User u WHERE u.username=:username")
+    User findByUsername(@Param("username") String username);
+
+    @Query("SELECT u FROM User u WHERE u.username=:username")
+    User findFirstByUsername(@Param("username")String username);
+
+
+    @Query("SELECT u FROM User u WHERE  u.isActive=true ")
+    Page<User> findUserPage(Pageable pageable);
+
+    @Query("SELECT u FROM User u WHERE u.isActive=true AND u.branch.uid=:branchUID")
+    Page<User> findUserPageByBranch(Pageable pageable, String branchUID);
+
+
+    @Query("""
+    SELECT DISTINCT u
+    FROM User u
+    LEFT JOIN FETCH u.branch
+    LEFT JOIN FETCH u.roles WHERE u.branch.uid=:branchUID
+""")
+    List<User> findAllUsersWithBranchAndRoles(@Param("branchUID")String branchUID);
+
+    @Query("""
+    SELECT
+        u.uid AS uid,
+        u.username AS username,
+        u.firstName AS firstName,
+        u.middleName AS middleName,
+        u.lastName AS lastName,
+        u.email AS email,
+        u.phone AS phone,
+        u.gender AS gender,
+        u.dateOfBirth AS dateOfBirth,
+        u.address AS address,
+        u.isRoot AS isRoot,
+        u.isBlocked AS isBlocked,
+        u.isActive AS isActive,
+        u.createdAt AS createdAt,
+        u.updatedAt AS updatedAt,
+
+        b.uid AS branchUid,
+        b.branchName AS branchName,
+        b.branchCode AS branchCode
+
+    FROM User u
+    LEFT JOIN u.branch b
+
+    ORDER BY u.createdAt DESC
+""")
+    Page<UserProjection> findUsers(
+            Pageable pageable
+    );
+
+    @Modifying
+    @Query(
+            value = """
+                DELETE FROM user_roles
+                WHERE user_uid = :uid
+                """,
+            nativeQuery = true
+    )
+    void deleteUserRoles(@Param("uid") String uid);
+
+    @Query("""
+    SELECT
+        u.uid AS uid,
+        u.username AS username,
+        u.firstName AS firstName,
+        u.middleName AS middleName,
+        u.lastName AS lastName,
+
+
+        r.name AS roleName,
+        r.uid AS roleUID,
+        r.code AS roleCode
+
+    FROM User u
+    LEFT JOIN u.roles r
+    WHERE u.uid = :userUID
+    """)
+    Optional<UserProjection> findUserWithRoles(
+            @Param("userUID") String userUID
+    );
+
+
+    @Query("""
+    SELECT
+    u.firstName AS firstName,
+    u.middleName AS middleName,
+    u.lastName AS lastName,
+    u.lastSeen AS lastSeen,
+    u.email AS email,
+    r.name AS roleName,
+    r.uid AS roleUID,
+    r.code AS roleCode,
+    b.branchName AS branchName,
+    b.branchCode AS branchCode
+    FROM User u
+    LEFT JOIN u.roles r
+    LEFT JOIN u.branch b
+    WHERE u.lastSeen >= :cutoffTime
+    ORDER BY u.lastSeen DESC
+""")
+    List<UserProjection> findOnlineUsers(
+            @Param("cutoffTime") LocalDateTime cutoffTime
+    );
+
+
+
+}
