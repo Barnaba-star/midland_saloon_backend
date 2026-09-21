@@ -35,4 +35,5 @@ build/
 ### App data - never commit user-uploaded files or local env overrides ###
 /uploads/
 .env
+local-env.sh
 .DS_Store
