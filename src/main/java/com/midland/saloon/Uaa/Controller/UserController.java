@@ -1,8 +1,10 @@
 package com.midland.saloon.Uaa.Controller;
 import com.midland.saloon.Config.Security.JwtTokenUtil;
+import com.midland.saloon.Setting.Model.Branch;
 import com.midland.saloon.Uaa.Dto.DataDTO;
 import com.midland.saloon.Uaa.Dto.LoginDTO;
 import com.midland.saloon.Uaa.Model.User;
+import com.midland.saloon.Setting.Service.PlatformSettingService;
 import com.midland.saloon.Uaa.Repository.UserRepository;
 import com.midland.saloon.Uaa.Service.UserService;
 import com.midland.saloon.Utils.Responses.Response;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -30,6 +33,7 @@ public class UserController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenUtil jwtTokenUtil;
+    private final PlatformSettingService platformSettingService;
 
 
 
@@ -59,6 +63,31 @@ public class UserController {
             return ResponseEntity
                     .status(HttpStatus.FORBIDDEN)
                     .body("Account Blocked");
+        }
+
+        // Branch must be within its free/paid period to log in. ROOT users
+        // and the platform's own ROOT branch are exempt - they're not a
+        // paying customer branch. closeSubscription == null means an admin
+        // hasn't configured a plan for this branch yet, which we treat as
+        // unrestricted rather than locking brand new branches out before
+        // anyone's had a chance to set one up.
+        Branch branch = user.getBranch();
+        boolean exempt = Boolean.TRUE.equals(user.getIsRoot())
+                || (branch != null && "ROOT".equalsIgnoreCase(branch.getBranchCode()));
+
+        // A grace period keeps a branch working for a few days past its end
+        // date rather than locking them out the same morning. Zero - the
+        // default - is the old behaviour exactly.
+        Integer graceDays = platformSettingService.current().getGracePeriodDays();
+        LocalDate lockoutDate = LocalDate.now().minusDays(graceDays == null ? 0 : graceDays);
+
+        if (!exempt
+                && branch != null
+                && branch.getCloseSubscription() != null
+                && branch.getCloseSubscription().isBefore(lockoutDate)) {
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body("Subscription Expired. Please pay to continue using the system.");
         }
 
         try {

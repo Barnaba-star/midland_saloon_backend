@@ -3,6 +3,7 @@ import com.midland.saloon.Setting.Model.Branch;
 import com.midland.saloon.Setting.Model.Role;
 import com.midland.saloon.Setting.Repository.BranchRepository;
 import com.midland.saloon.Setting.Repository.RoleRepository;
+import com.midland.saloon.Setting.Service.PlatformSettingService;
 import com.midland.saloon.Uaa.Model.Permission;
 import com.midland.saloon.Uaa.Model.User;
 import com.midland.saloon.Uaa.Repository.PermissionRepository;
@@ -37,21 +38,24 @@ public class Initializer implements ApplicationRunner {
     private final RoleRepository roleRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final BranchRepository branchRepository;
+    private final PlatformSettingService platformSettingService;
 
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
         seedPermissions();
         seedSuperRole();
+        seedStandardRoles();
         seedSuperUser();
         seedRootBranch();
+        platformSettingService.seedIfMissing();
     }
 
     public void seedPermissions() throws Exception {
         log.info("************************Seed Permissions******************************");
         InputStream inputStream = null;
         try{
-            inputStream = new ClassPathResource("/Seed/Permission.csv").getInputStream();
+            inputStream = new ClassPathResource("seed/Permission.csv").getInputStream();
 
         }catch (IOException e){
             e.printStackTrace();
@@ -100,19 +104,185 @@ public class Initializer implements ApplicationRunner {
         }
     }
 
+    // Standard branch-scoped roles: CEO (full operational access to their
+    // own branch), MANAGER (moderate - day-to-day operations, no deletes on
+    // sensitive records), CASHIER (front-desk sales only). None of these get
+    // SAVE_BRANCH/DELETE_BRANCH/VIEW_ALL_BRANCHES/SAVE_ROLE/DELETE_ROLE -
+    // those stay ROOT-only since they're cross-branch/platform-wide, not
+    // something a single branch's staff should touch. If a role already
+    // exists, any of the permissions listed here that it's missing are added
+    // back on every startup (so a role created before a permission was added
+    // to this list still gets it). Nothing is ever removed - permissions
+    // granted via the Role admin UI beyond this list are kept - but a listed
+    // permission removed via the UI will come back on the next restart.
+    public void seedStandardRoles() throws Exception {
+        log.info("***************************Seed Standard Roles*****************************");
+
+        seedRoleWithPermissions(
+                "CEO",
+                "Company owner - full operational access within their own branch",
+                List.of(
+                        "SAVE_USER", "VIEW_USER", "DELETE_USER", "ENABLE_OR_DISABLE_USER",
+                        "DELETE_SALOON_USER", "ASSIGN_USER_ROLE", "ENABLE_OR_DISABLE_ACCOUNT",
+                        "VIEW_ROLE",
+                        "VIEW_BRANCH",
+                        "SAVE_COMMISSION", "VIEW_COMMISSION", "DELETE_COMMISSION",
+                        "VIEW_TABLE_SIZE",
+                        "SAVE_SERVICE", "VIEW_SERVICE", "DELETE_SERVICE",
+                        "VIEW_STAFF", "SAVE_STAFF", "DELETE_STAFF",
+                        "SAVE_SALES", "VIEW_SALES", "DELETE_SALES",
+                        "VIEW_REPORT", "PAY_STAFF", "SAVE_EXPENSES", "VIEW_EXPENSES",
+                        "SAVE_STOCK_AND_PURCHASE", "VIEW_STOCK_AND_PURCHASE",
+                        "SAVE_STORE", "VIEW_STORE", "DELETE_STORE"
+                )
+        );
+
+        seedRoleWithPermissions(
+                "MANAGER",
+                "Branch manager - day-to-day operations, moderate access",
+                List.of(
+                        "VIEW_BRANCH",
+                        "SAVE_USER", "VIEW_USER",
+                        "SAVE_SALES", "VIEW_SALES",
+                        "SAVE_SERVICE", "VIEW_SERVICE",
+                        "SAVE_STAFF", "VIEW_STAFF",
+                        "VIEW_REPORT", "VIEW_EXPENSES", "VIEW_STOCK_AND_PURCHASE",
+                        "SAVE_STORE", "VIEW_STORE", "DELETE_STORE"
+                )
+        );
+
+        seedRoleWithPermissions(
+                "CASHIER",
+                "Front-desk cashier - day-to-day sales only",
+                List.of(
+                        "VIEW_BRANCH",
+                        "SAVE_SALES", "VIEW_SALES",
+                        "VIEW_STORE",
+                        "VIEW_SERVICE",
+                        // Staff report + Store report tabs under "Matumizi"
+                        "VIEW_REPORT"
+                )
+        );
+
+        // DIRECTOR and STAFF are system/settings-management roles (see Dashboard
+        // + Settings, unlike CEO/MANAGER/CASHIER who land straight on POS).
+        // Left with no permissions on purpose - assigned by hand via the Role
+        // admin UI (Settings > Role > assign permissions) rather than seeded,
+        // per explicit instruction.
+        // DIRECTOR manages Role, Branch and Users across every branch -
+        // Permission, Config and Storage stay ROOT-only.
+        seedRoleWithPermissions(
+                "DIRECTOR",
+                "System/settings management role",
+                List.of(
+                        "VIEW_BRANCH", "VIEW_ALL_BRANCHES", "SAVE_BRANCH", "DELETE_BRANCH",
+                        "VIEW_USER", "SAVE_USER", "DELETE_USER", "ASSIGN_USER_ROLE",
+                        "ENABLE_OR_DISABLE_USER", "ENABLE_OR_DISABLE_ACCOUNT",
+                        "VIEW_ROLE", "SAVE_ROLE", "DELETE_ROLE",
+                        "VIEW_PERMISSION", "SAVE_PERMISSION",
+                        "VIEW_COMMISSION_REPORT",
+                        // Settings > Errors, so a DIRECTOR can see what broke
+                        // without going through ROOT.
+                        "VIEW_ERROR_LOG", "DELETE_ERROR_LOG"
+                )
+        );
+        // STAFF registers branches (only ever seeing its own) and sets up
+        // that branch's first users and their roles. Everything else in
+        // Settings is DIRECTOR/ROOT.
+        seedRoleWithPermissions(
+                "STAFF",
+                "System/settings management role",
+                List.of(
+                        "VIEW_BRANCH", "VIEW_ALL_BRANCHES", "SAVE_BRANCH", "DELETE_BRANCH",
+                        "VIEW_USER", "SAVE_USER", "ASSIGN_USER_ROLE",
+                        "VIEW_ROLE",
+                        // Scoped server-side to their own earnings only -
+                        // see CommissionService.seesAllStaff().
+                        "VIEW_COMMISSION_REPORT"
+                )
+        );
+    }
+
+    private void seedRoleWithPermissions(String code, String description, List<String> permissionNames) throws Exception {
+        Role existing = roleRepository.findByCode(code);
+        if (existing != null) {
+            addMissingPermissions(existing, permissionNames);
+            return;
+        }
+
+        List<Permission> permissions = new ArrayList<>();
+        for (String name : permissionNames) {
+            permissionRepository.findByName(name).ifPresent(permissions::add);
+        }
+
+        Role role = new Role();
+        role.setCode(code);
+        role.setName(code);
+        role.setDescription(description);
+        role.setPermission(permissions);
+
+        try {
+            roleRepository.save(role);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new Exception("Error in Seeding Role: " + code);
+        }
+    }
+
+    private void addMissingPermissions(Role role, List<String> permissionNames) throws Exception {
+        List<Permission> current = role.getPermission() == null
+                ? new ArrayList<>()
+                : new ArrayList<>(role.getPermission());
+        List<String> added = new ArrayList<>();
+        for (String name : permissionNames) {
+            boolean alreadyHas = current.stream().anyMatch(p -> name.equals(p.getName()));
+            if (alreadyHas) {
+                continue;
+            }
+            Optional<Permission> permission = permissionRepository.findByName(name);
+            if (permission.isPresent()) {
+                current.add(permission.get());
+                added.add(name);
+            } else {
+                log.warn("Permission " + name + " not found - not added to role " + role.getCode());
+            }
+        }
+        if (added.isEmpty()) {
+            return;
+        }
+        role.setPermission(current);
+        try {
+            roleRepository.save(role);
+            log.info("Added missing permissions to role " + role.getCode() + ": " + added);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new Exception("Error in updating Role: " + role.getCode());
+        }
+    }
+
+    // The branch STAFF, DIRECTOR and ROOT all sit on - they run the platform
+    // rather than a saloon of their own. Its display name is free to change;
+    // this code is not.
+    private static final String ROOT_BRANCH_CODE = "ROOT";
+
     public void seedRootBranch() throws Exception{
         log.info("*****************************Seed Main Branch***************************");
-        Optional<Branch> optionalBranch = branchRepository.findRootBranch("ROOT BRANCH");
-        if(optionalBranch.isEmpty()){
+        // Looked up by CODE, never by name. The code is the identifier the rest
+        // of the system keys on (login's subscription exemption, the super
+        // user's branch, the disabled edit/delete buttons); the name is only
+        // ever display text and can be renamed freely. Matching on the name
+        // would quietly seed a SECOND root branch the moment it was renamed.
+        Branch existingRoot = branchRepository.findByBranchCode(ROOT_BRANCH_CODE);
+        if(existingRoot == null){
             Branch branch = new Branch();
-            branch.setBranchName("ROOT BRANCH");
+            branch.setBranchName("MIDLAND SOLUTIONS");
             branch.setBranchCategory("ALL CATEGORIES");
-            branch.setBranchCode("ROOT");
+            branch.setBranchCode(ROOT_BRANCH_CODE);
             branch.setRegion("DODOMA");
             branch.setStatus("ACTIVE");
             branch.setAddress("DODOMA");
             branch.setPhone("0000-0000-0000");
-            branch.setDescription("BRANCH FOR SUPER USER ACTIVITIES FOR ALL BRANCHES");
+            branch.setDescription("INASIMAMIA MATAWI NA WATUMIAJI WA MFUMO, SI SALOON");
             try{
                 branchRepository.save(branch);
             }catch (Exception e){
@@ -126,7 +296,7 @@ public class Initializer implements ApplicationRunner {
         log.info("*****************************Seed Super User***************************");
         User user = userRepository.findFirstByUsername("root@root.com");
         Role role = roleRepository.findByCode("ROOT");
-        Branch branch = branchRepository.findByBranchCode("ROOT");
+        Branch branch = branchRepository.findByBranchCode(ROOT_BRANCH_CODE);
         if(user == null){
             User superUser = new User();
             superUser.setUsername("root@root.com");

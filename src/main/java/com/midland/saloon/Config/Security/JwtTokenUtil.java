@@ -6,6 +6,8 @@ import com.midland.saloon.Uaa.Model.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import com.midland.saloon.Setting.Service.PlatformSettingService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
@@ -14,15 +16,21 @@ import java.util.Date;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class JwtTokenUtil {
     @Value("${jwt.secret}")
     private String PRIVATE_KEY;
+
+    private final PlatformSettingService platformSettingService;
 
 
 
     public String generateToken(User user){
         String username = user.getUsername();
-        long expirationTime = 1000 * 60 * 60 * 24;
+        // Session length is configurable in Settings > Config; the fallback
+        // matches the 24 hours this used to be fixed at.
+        Integer sessionHours = platformSettingService.current().getSessionHours();
+        long expirationTime = 1000L * 60 * 60 * (sessionHours == null ? 24 : sessionHours);
         Boolean isRoot = user.getIsRoot();
         String branchUID = user.getBranch().getUid();
         String fullName = String.format("%s             %s", user.getFirstName(), user.getLastName());
