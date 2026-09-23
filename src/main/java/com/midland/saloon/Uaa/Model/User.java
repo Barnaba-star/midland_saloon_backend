@@ -24,7 +24,10 @@ import java.util.List;
         // lists, online users, ...) filters on this column. With
         // ~1000 branches sharing the table, an unindexed lookup here
         // would mean a full scan of the whole users table every time.
-        @Index(name = "idx_users_branch_uid", columnList = "branch_uid")
+        @Index(name = "idx_users_branch_uid", columnList = "branch_uid"),
+        // Looked up once per authenticated request to build the principal,
+        // so this is the single hottest lookup in the system.
+        @Index(name = "idx_users_username", columnList = "username")
 })
 public class User extends BaseEntity {
 

@@ -48,7 +48,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
        // Boolean isRoot = jwtTokenUtil.isRoot(token);
         boolean isRoot = Boolean.TRUE.equals(jwtTokenUtil.isRoot(token));
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            User user = userRepository.findByUsername(username);
+            User user = userRepository.findByUsernameForAuthentication(username);
             List<SimpleGrantedAuthority> authorities;
             if (isRoot) {
                 authorities = List.of(new SimpleGrantedAuthority("ROOT"));

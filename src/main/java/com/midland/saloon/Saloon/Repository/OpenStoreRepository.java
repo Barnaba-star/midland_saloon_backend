@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -110,6 +111,20 @@ public interface OpenStoreRepository extends JpaRepository<StoreOpen, String> {
         List<StoreOpen> findOpenStoreListByService(
                 @Param("branchUID") String branchUID,
                 @Param("saloonServiceEntity") SaloonServiceEntity saloonServiceEntity
+        );
+
+        // The open stores behind every service on one sale, in a single select.
+        @Query("""
+    SELECT o
+    FROM StoreOpen o
+    JOIN FETCH o.store s
+    WHERE o.branchUid = :branchUID
+      AND o.status = 'OPEN'
+      AND s.saloonServiceEntity.uid IN :serviceUids
+""")
+        List<StoreOpen> findOpenStoreListByServices(
+                @Param("branchUID") String branchUID,
+                @Param("serviceUids") Collection<String> serviceUids
         );
 
 

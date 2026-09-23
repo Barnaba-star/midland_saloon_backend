@@ -3,6 +3,7 @@ package com.midland.saloon.Setting.Model;
 import com.midland.saloon.Utils.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.*;
 
@@ -14,8 +15,29 @@ import java.time.LocalDate;
 @Getter
 @Setter
 @ToString
-@Table(name = "branches")
+@Table(name = "branches", indexes = {
+        // STAFF branch lists and the commission report both filter on the creator.
+        @Index(
+                name = "idx_branches_created_by",
+                columnList = "created_by"
+        ),
+        // Looked up on every branch-code check, including at startup.
+        @Index(
+                name = "idx_branches_branch_code",
+                columnList = "branch_code"
+        ),
+        // The daily expiry job scans on these two together.
+        @Index(
+                name = "idx_branches_subscription",
+                columnList = "subscription_status, close_subscription"
+        )
+})
 public class Branch extends BaseEntity {
+
+    // UID of the user who registered this branch. STAFF only ever sees the
+    // branches they created themselves; ROOT and DIRECTOR see them all.
+    @Column(name = "created_by")
+    private String createdBy;
 
     @Column(
             name = "branch_name",
@@ -73,4 +95,11 @@ public class Branch extends BaseEntity {
 
     @Column(name = "subscription_phone_number")
     private String subscriptionPhoneNumber;
+
+    // Snippe payment reference last applied to this branch's subscription -
+    // used to ignore duplicate webhook deliveries (Snippe retries on
+    // anything that isn't a fast 2xx, so the same payment.completed event
+    // can arrive more than once).
+    @Column(name = "last_subscription_payment_ref")
+    private String lastSubscriptionPaymentRef;
 }

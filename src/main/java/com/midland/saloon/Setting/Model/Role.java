@@ -8,6 +8,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 
 import java.util.List;
@@ -35,7 +36,10 @@ public class Role extends BaseEntity {
     @Column(name = "category")
     private String category;
 
+    // Batched so loading a user's roles costs one extra select for all of them
+    // together, not one per role.
     @ManyToMany(fetch = FetchType.EAGER)
+    @BatchSize(size = 100)
     @JoinTable(
             name = "role_permission",
             joinColumns=@JoinColumn(name = "role_uid"),

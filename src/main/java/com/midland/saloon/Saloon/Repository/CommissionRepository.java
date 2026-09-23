@@ -7,8 +7,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -46,4 +48,16 @@ public interface CommissionRepository extends JpaRepository<Commission, String> 
             SELECT c FROM Commission c WHERE c.saloonService=:service AND c.branchUid=:branchUID
             """)
     Optional<Commission> findCommissionByService(SaloonServiceEntity service, String branchUID);
+
+    // Every service on one sale in a single select. Recording a sale used to
+    // look each commission up on its own, three separate times over.
+    @Query("""
+            SELECT c FROM Commission c
+            LEFT JOIN FETCH c.saloonService s
+            WHERE c.branchUid=:branchUID AND s.uid IN :serviceUids
+            """)
+    List<Commission> findCommissionsByServices(
+            @Param("serviceUids") Collection<String> serviceUids,
+            @Param("branchUID") String branchUID
+    );
 }

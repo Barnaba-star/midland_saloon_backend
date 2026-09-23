@@ -29,7 +29,9 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Objects;
 
@@ -337,6 +339,7 @@ public class SaloonService {
         List<SaloonSales> sales = new ArrayList<>();
         List<Commission> commissions = new ArrayList<>();
         List<StockAndPurchase> stockAndPurchases = new ArrayList<>();
+        Map<String, Commission> commissionsByService = loadCommissionsByService(saloonServiceEntities);
         for (SaloonServiceEntity service : saloonServiceEntities) {
             if (service == null) {log.info("Skipping null service");
                 continue;
@@ -348,16 +351,16 @@ public class SaloonService {
             }
 
 
-            Optional<Commission> optionalCommission = commissionRepository.findCommissionByService(service, LoggerUser.getBranchUID());
-            if(optionalCommission.isEmpty())
+            Commission commission = commissionsByService.get(service.getUid());
+            if(commission == null)
                 return new ResponseList<>("No Commission Found ");
-            staffBill.add(optionalCommission.get().getStaffPercent()* (service.getPrice()/100));
+            staffBill.add(commission.getStaffPercent()* (service.getPrice()/100));
             bills.add(service.getPrice());
             SaloonSales sale = new SaloonSales();
             sale.setSaloonStaff(staff);
             sale.setSaloonServiceEntity(service);
             sale.setSalesOpened(salesOpened);
-            commissions.add(optionalCommission.get());
+            commissions.add(commission);
             sales.add(sale);
 
         }
@@ -410,7 +413,7 @@ public class SaloonService {
                     savedSaloonSales.size()
             );
 
-            ResponseList<SaloonReports> reportsResponse = saveSaloonReport(savedSaloonSales, staff);
+            ResponseList<SaloonReports> reportsResponse = saveSaloonReport(savedSaloonSales, staff, commissionsByService);
 
             // ============================
             // CHECK REPORT RESPONSE
@@ -456,7 +459,7 @@ public class SaloonService {
                         "Error in saving Income and Expenses"
                 );
             }
-            ResponseList<StockAndPurchase> andPurchaseResponseList = saveStockAndPurchase(saloonServiceEntities);
+            ResponseList<StockAndPurchase> andPurchaseResponseList = saveStockAndPurchase(saloonServiceEntities, commissionsByService);
             if (andPurchaseResponseList.getData() == null ||
                     andPurchaseResponseList.getData().isEmpty()) {
 
@@ -1263,8 +1266,26 @@ public class SaloonService {
     /***
      SALOON_REPORT_METHODS
      */
+    // Commissions arrive already looked up by the caller, keyed on service UID.
+    private Map<String, Commission> loadCommissionsByService(List<SaloonServiceEntity> services) {
+        List<String> serviceUids = services.stream()
+                .filter(Objects::nonNull)
+                .map(SaloonServiceEntity::getUid)
+                .toList();
+        if (serviceUids.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Commission> byService = new HashMap<>();
+        for (Commission commission : commissionRepository.findCommissionsByServices(serviceUids, LoggerUser.getBranchUID())) {
+            if (commission.getSaloonService() != null) {
+                byService.put(commission.getSaloonService().getUid(), commission);
+            }
+        }
+        return byService;
+    }
+
     @Transactional
-    private ResponseList<SaloonReports> saveSaloonReport(List<SaloonSales> sales, SaloonStaff staff) {
+    private ResponseList<SaloonReports> saveSaloonReport(List<SaloonSales> sales, SaloonStaff staff, Map<String, Commission> commissionsByService) {
         log.info("{} is saving saloon reports"+ LoggerUser.getEmail());
         log.info("Staff received for reports: {}"+ staff);
         List<String> errors = new ArrayList<>();
@@ -1367,13 +1388,10 @@ public class SaloonService {
                     service.getUid()
             );
 
-            Optional<Commission> optionalCommission =
-                    commissionRepository.findCommissionByService(
-                            service,
-                            branchUID
-                    );
+            Commission commission =
+                    commissionsByService.get(service.getUid());
 
-            if (optionalCommission.isEmpty()) {
+            if (commission == null) {
 
                 log.info(
                         "COMMISSION NOT FOUND. Service: {}, Branch: {}"+
@@ -1387,9 +1405,6 @@ public class SaloonService {
 
                 continue;
             }
-
-            Commission commission =
-                    optionalCommission.get();
 
             log.info(
                     "COMMISSION FOUND. Service: {}"+
@@ -1590,12 +1605,15 @@ public class SaloonService {
 
         List<ServiceAndStoreReport> serviceAndStoreReports = new ArrayList<>();
 
+        Map<String, List<StoreOpen>> openStoresByService =
+                getOpenStoresByService(reports.getData());
+
         for (SaloonReports report : reports.getData()) {
             Integer storeOpened=0;
             List<StoreOpen> storeOpens =
-                    openStoreRepository.findOpenStoreListByService(
-                            LoggerUser.getBranchUID(),
-                            report.getSaloonServiceEntity()
+                    openStoresByService.getOrDefault(
+                            report.getSaloonServiceEntity().getUid(),
+                            List.of()
                     );
 
             if (storeOpens.isEmpty()) {
@@ -1635,6 +1653,32 @@ public class SaloonService {
 
 
         return new ResponseList<>(savedReports);
+    }
+
+    // Open stores for every service in a batch of reports, grouped by service UID.
+    private Map<String, List<StoreOpen>> getOpenStoresByService(List<SaloonReports> reports) {
+        List<String> serviceUids = reports.stream()
+                .map(SaloonReports::getSaloonServiceEntity)
+                .filter(Objects::nonNull)
+                .map(SaloonServiceEntity::getUid)
+                .distinct()
+                .toList();
+        if (serviceUids.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, List<StoreOpen>> byService = new HashMap<>();
+        for (StoreOpen storeOpen : openStoreRepository.findOpenStoreListByServices(
+                LoggerUser.getBranchUID(),
+                serviceUids
+        )) {
+            SaloonServiceEntity service = storeOpen.getStore() != null
+                    ? storeOpen.getStore().getSaloonServiceEntity()
+                    : null;
+            if (service != null) {
+                byService.computeIfAbsent(service.getUid(), uid -> new ArrayList<>()).add(storeOpen);
+            }
+        }
+        return byService;
     }
 
     private Integer calculatePercentage(Integer percentage, Integer amount) {
@@ -2488,42 +2532,71 @@ public class SaloonService {
                 weekDate
         );
     }
-    public ResponseList<StockAndPurchase> saveStockAndPurchase(List<SaloonServiceEntity> saloonServiceEntities) {
+
+    // Same week-row lookup as above, but for every service on a sale at once.
+    // Rows come back newest first, so the first one seen per service wins.
+    private Map<String, StockAndPurchase> getCurrentWeekByServices(List<SaloonServiceEntity> services) {
+        List<String> serviceUids = services.stream()
+                .filter(Objects::nonNull)
+                .map(SaloonServiceEntity::getUid)
+                .toList();
+        if (serviceUids.isEmpty()) {
+            return Map.of();
+        }
+        LocalDate weekDate = LocalDate.now()
+                .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        Map<String, StockAndPurchase> byService = new HashMap<>();
+        for (StockAndPurchase purchase : stockAndPurchaseRepository.findCurrentWeekByServices(
+                LoggerUser.getBranchUID(),
+                serviceUids,
+                weekDate
+        )) {
+            if (purchase.getSaloonService() != null) {
+                byService.putIfAbsent(purchase.getSaloonService().getUid(), purchase);
+            }
+        }
+        return byService;
+    }
+    public ResponseList<StockAndPurchase> saveStockAndPurchase(List<SaloonServiceEntity> saloonServiceEntities,
+                                                               Map<String, Commission> commissionsByService) {
         log.info(LoggerUser.getEmail() + " Is saving Stock And Purchase");
         if (saloonServiceEntities.isEmpty()) {
             throw new BusinessException("Saloon Service is Empty");
         }
 
+        Map<String, StockAndPurchase> currentWeekByService =
+                getCurrentWeekByServices(saloonServiceEntities);
+
         List<StockAndPurchase> stockAndPurchases = new ArrayList<>();
         for (SaloonServiceEntity entity : saloonServiceEntities) {
-            Optional<Commission> commission = commissionRepository.findCommissionByService(entity, LoggerUser.getBranchUID());
-            if (commission.isEmpty()) {
+            Commission commission = commissionsByService.get(entity.getUid());
+            if (commission == null) {
                 throw new BusinessException("Commission Not Found For: " + entity.getServiceName());
             }
 
-            Optional<StockAndPurchase> stockAndPurchase =
-                    getCurrentWeekByService(entity.getUid());
+            StockAndPurchase stockAndPurchase =
+                    currentWeekByService.get(entity.getUid());
 
             int stockPurchaseAmount =
                     entity.getPrice()
-                            * commission.get().getStockPurchasePercent()
+                            * commission.getStockPurchasePercent()
                             / 100;
 
             StockAndPurchase purchase;
 
-            if (stockAndPurchase.isEmpty()) {
+            if (stockAndPurchase == null) {
 
                 purchase = new StockAndPurchase();
 
                 purchase.setSaloonService(entity);
-                purchase.setCommission(commission.get());
+                purchase.setCommission(commission);
 
                 purchase.setTotalAmount(stockPurchaseAmount);
                 purchase.setRemainingAmount(stockPurchaseAmount);
 
             } else {
 
-                purchase = stockAndPurchase.get();
+                purchase = stockAndPurchase;
 
                 purchase.setTotalAmount(
                         purchase.getTotalAmount() + stockPurchaseAmount

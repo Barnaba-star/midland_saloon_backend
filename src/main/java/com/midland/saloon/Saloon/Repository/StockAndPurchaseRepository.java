@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +26,22 @@ public interface StockAndPurchaseRepository extends JpaRepository<StockAndPurcha
     Optional<StockAndPurchase> findCurrentWeekByService(
             @Param("branchUID") String branchUID,
             @Param("serviceUid") String serviceUid,
+            @Param("weekDate") LocalDate weekDate
+    );
+
+    // This week's rows for every service on one sale, in one select.
+    @Query("""
+    SELECT s
+    FROM StockAndPurchase s
+    LEFT JOIN FETCH s.saloonService svc
+    WHERE svc.uid IN :serviceUids
+      AND s.weekDate = :weekDate
+      AND s.branchUid = :branchUID
+    ORDER BY s.createdAt DESC
+""")
+    List<StockAndPurchase> findCurrentWeekByServices(
+            @Param("branchUID") String branchUID,
+            @Param("serviceUids") Collection<String> serviceUids,
             @Param("weekDate") LocalDate weekDate
     );
     @Query("""
