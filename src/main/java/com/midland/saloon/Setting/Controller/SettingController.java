@@ -2,6 +2,7 @@ package com.midland.saloon.Setting.Controller;
 
 import com.midland.saloon.Config.Security.LoggerUser;
 import com.midland.saloon.Setting.Dto.BranchDTO;
+import com.midland.saloon.Setting.Dto.SubscriptionPaymentDTO;
 import com.midland.saloon.Setting.Dto.TableSizeDto;
 import com.midland.saloon.Setting.Model.Branch;
 import com.midland.saloon.Setting.Service.SettingService;
@@ -11,6 +12,7 @@ import com.midland.saloon.Uaa.Repository.UserRepository;
 import com.midland.saloon.Utils.Responses.Response;
 import com.midland.saloon.Utils.Responses.ResponseList;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -74,9 +76,17 @@ public class SettingController {
         return new ResponseList<>(userRepository.findOnlineUsers(cutoffTime));
     }
     @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_BRANCH')")
-    @GetMapping("/saveBranchSubscription")
+    @PostMapping("/saveBranchSubscription")
     public Response<Branch> saveBranchSubscription(@RequestBody BranchDTO branchDTO){
         return service.saveBranchSubscription(branchDTO);
+    }
+
+    // Any logged-in branch user can request a subscription payment for
+    // their own branch - LoggerUser.getBranchUID() scopes it, the client
+    // never gets to pick which branch pays.
+    @PostMapping("/updateSubscription")
+    public Response<Branch> updateSubscription(@Valid @RequestBody SubscriptionPaymentDTO subscriptionPaymentDTO){
+        return service.updateSubscription(subscriptionPaymentDTO);
     }
 
 }

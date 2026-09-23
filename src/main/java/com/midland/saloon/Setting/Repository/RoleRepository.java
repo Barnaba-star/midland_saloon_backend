@@ -19,6 +19,8 @@ public interface RoleRepository extends JpaRepository<Role, String> {
     Role findFirstByName(@Param("roleName") String roleName);
 
     Role findByCode(String code);
+
+    List<Role> findByCodeIn(List<String> codes);
     @Query("""
     SELECT r
     FROM Role r
@@ -26,6 +28,15 @@ public interface RoleRepository extends JpaRepository<Role, String> {
     ORDER BY r.createdAt DESC
 """)
     Page<Role> findRolePage(Pageable pageable);
+
+    @Query("""
+    SELECT r
+    FROM Role r
+    WHERE r.isActive = true
+      AND r.code IN :codes
+    ORDER BY r.createdAt DESC
+""")
+    Page<Role> findRolePageByCodes(@Param("codes") List<String> codes, Pageable pageable);
 
     @Query(
             value = """

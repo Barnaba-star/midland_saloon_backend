@@ -61,6 +61,10 @@ public class WebSecurityConfiguration {
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/authentication/**").permitAll()
+                        // Snippe posts these server-to-server with no JWT - trust is
+                        // established via HMAC signature verification instead (see
+                        // SnippeWebhookController / SnippeClient.verifyWebhookSignature).
+                        .requestMatchers("/setting/webhooks/**").permitAll()
                         .anyRequest().authenticated()
                 )
 

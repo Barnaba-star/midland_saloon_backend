@@ -43,7 +43,7 @@ public class UserSettingController {
     @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_USER')")
     @PostMapping("/findUsers")
     public ResponsePage<UserProjection> findUsers(@RequestBody PageableParam pageableParam){
-        return userService.findUsers(pageableParam.getPage(), pageableParam.getSize());
+        return userService.findUsers(pageableParam);
     }
 
     @PreAuthorize("@authChecker.hasPermissionOrRoot('ASSIGN_USER_ROLE')")

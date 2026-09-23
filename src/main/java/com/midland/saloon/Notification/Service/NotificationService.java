@@ -90,11 +90,8 @@ public class NotificationService {
     }
 
     public List<Notification> findMyNotifications() {
-
         String userUID = LoggerUser.getUser().getUid();
-
         Pageable pageable = PageRequest.of(0, MAX_NOTIFICATIONS);
-
         return notificationRepository.findByTargetUser(userUID, pageable);
     }
 
@@ -111,8 +108,6 @@ public class NotificationService {
         }
 
         Notification notification = optionalNotification.get();
-
-        // A user should only be able to mark their own notifications.
         if (!notification.getTargetUserUID().equals(LoggerUser.getUser().getUid())) {
             return;
         }

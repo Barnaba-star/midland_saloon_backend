@@ -7,6 +7,7 @@ import com.midland.saloon.Setting.Model.Role;
 import com.midland.saloon.Setting.Projection.BranchProjection;
 import com.midland.saloon.Setting.Repository.RoleRepository;
 import com.midland.saloon.Uaa.Model.Permission;
+import com.midland.saloon.Uaa.Model.User;
 import com.midland.saloon.Uaa.Repository.PermissionRepository;
 import com.midland.saloon.Utils.Responses.Response;
 import com.midland.saloon.Utils.Responses.ResponseList;
@@ -102,13 +103,35 @@ public class RoleService {
     }
     public ResponseList<Role> findRoles(){
         log.info(LoggerUser.getEmail() + "is Accessing Roles");
+        if (!seesAllRoles()) {
+            return new ResponseList<>(roleRepository.findByCodeIn(STAFF_VISIBLE_ROLE_CODES));
+        }
         return new ResponseList<>(roleRepository.findAll());
     }
+    // STAFF only manages the branch-operational roles; ROOT and DIRECTOR
+    // see every role.
+    private static final List<String> STAFF_VISIBLE_ROLE_CODES = List.of("CEO", "MANAGER", "CASHIER");
+
     public ResponsePage<Role> findRolePage(int page, int size){
         log.info(LoggerUser.getEmail() + "is accessing Role");
         Pageable pageable = PageRequest.of(page, size);
+        if (!seesAllRoles()) {
+            return new ResponsePage<>(roleRepository.findRolePageByCodes(STAFF_VISIBLE_ROLE_CODES, pageable));
+        }
         return new ResponsePage<>(roleRepository.findRolePage(pageable));
     }
+    // ROOT and DIRECTOR manage every role; everyone else (STAFF included)
+    // only ever sees the branch-operational ones.
+    private boolean seesAllRoles() {
+        User user = LoggerUser.getUser();
+        List<String> roleCodes = user.getRoles() == null
+                ? List.of()
+                : user.getRoles().stream().map(Role::getCode).toList();
+        return Boolean.TRUE.equals(user.getIsRoot())
+                || roleCodes.contains("ROOT")
+                || roleCodes.contains("DIRECTOR");
+    }
+
     public ResponseList<Permission> findPermissionsByRole(String roleUID){
         if(roleUID == null)
             return new ResponseList<>("Provide Role Module");
