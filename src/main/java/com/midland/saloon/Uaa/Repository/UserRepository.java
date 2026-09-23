@@ -26,6 +26,18 @@ public interface UserRepository extends JpaRepository<User, String> {
     @Query("SELECT u FROM User u WHERE u.username=:username")
     User findFirstByUsername(@Param("username")String username);
 
+    // The principal every authenticated request is built from. Branch and roles
+    // come back in the same select so the filter does not trigger one lookup per
+    // association; role permissions follow in a single batched select.
+    @Query("""
+    SELECT DISTINCT u
+    FROM User u
+    LEFT JOIN FETCH u.branch
+    LEFT JOIN FETCH u.roles
+    WHERE u.username = :username
+""")
+    User findByUsernameForAuthentication(@Param("username") String username);
+
 
     @Query("SELECT u FROM User u WHERE  u.isActive=true ")
     Page<User> findUserPage(Pageable pageable);
@@ -66,12 +78,25 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     FROM User u
     LEFT JOIN u.branch b
-
-    ORDER BY u.createdAt DESC
+    WHERE (:search IS NULL
+           OR LOWER(u.firstName) LIKE %:search%
+           OR LOWER(u.middleName) LIKE %:search%
+           OR LOWER(u.lastName) LIKE %:search%
+           OR LOWER(u.username) LIKE %:search%
+           OR LOWER(u.email) LIKE %:search%
+           OR LOWER(u.phone) LIKE %:search%
+           OR LOWER(b.branchName) LIKE %:search%)
 """)
     Page<UserProjection> findUsers(
+            @Param("search") String search,
             Pageable pageable
     );
+
+    // Everyone holding a given role. The commission report starts from this
+    // so a STAFF member shows up the day they are given the role, with zeros,
+    // instead of only appearing once they have registered their first branch.
+    @Query("SELECT DISTINCT u FROM User u JOIN u.roles r WHERE r.code = :code")
+    List<User> findAllByRoleCode(@Param("code") String code);
 
     @Modifying
     @Query(

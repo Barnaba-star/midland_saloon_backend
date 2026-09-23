@@ -10,6 +10,7 @@ import com.midland.saloon.Uaa.Model.User;
 import com.midland.saloon.Uaa.Projection.UserProjection;
 import com.midland.saloon.Uaa.Repository.UserRepository;
 import com.midland.saloon.Utils.Exceptions.BusinessException;
+import com.midland.saloon.Utils.PageableParam;
 import com.midland.saloon.Utils.Responses.Response;
 import com.midland.saloon.Utils.Responses.ResponsePage;
 import jakarta.transaction.Transactional;
@@ -21,7 +22,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
@@ -96,10 +99,36 @@ public class UserService {
         return new ResponsePage<>(userRepository.findUserPage(pageable));
     }
 
-    public ResponsePage<UserProjection> findUsers(int page, int size){
+    // Sort fields tunazokubali kutoka kwa mteja, kila moja na path yake kwenye query ya findUsers.
+    private static final Map<String, String> USER_SORT_FIELDS = Map.ofEntries(
+            Map.entry("username", "u.username"),
+            Map.entry("firstName", "u.firstName"),
+            Map.entry("middleName", "u.middleName"),
+            Map.entry("lastName", "u.lastName"),
+            Map.entry("email", "u.email"),
+            Map.entry("phone", "u.phone"),
+            Map.entry("gender", "u.gender"),
+            Map.entry("dateOfBirth", "u.dateOfBirth"),
+            Map.entry("address", "u.address"),
+            Map.entry("isActive", "u.isActive"),
+            Map.entry("isBlocked", "u.isBlocked"),
+            Map.entry("isRoot", "u.isRoot"),
+            Map.entry("createdAt", "u.createdAt"),
+            Map.entry("updatedAt", "u.updatedAt"),
+            Map.entry("branchName", "b.branchName"),
+            Map.entry("branchCode", "b.branchCode")
+    );
+
+    public ResponsePage<UserProjection> findUsers(PageableParam pageableParam){
         log.info(LoggerUser.getEmail() + "is Accessing Users");
-        Pageable pageable = PageRequest.of(page, size);
-        return new ResponsePage<>(userRepository.findUsers(pageable));
+        // field isiyojulikana ingeangusha query, kwa hiyo turudi kwenye createdAt
+        pageableParam.setSortBy(USER_SORT_FIELDS.getOrDefault(pageableParam.getSortBy(), "u.createdAt"));
+        // Null rather than "" so the query skips the LIKE branches entirely
+        // when the search box is empty.
+        String search = pageableParam.getSearchParam() == null || pageableParam.getSearchParam().isBlank()
+                ? null
+                : pageableParam.getSearchParam().trim().toLowerCase();
+        return new ResponsePage<>(userRepository.findUsers(search, pageableParam.pageable(true)));
     }
     public Response<User> assignOrUnAssignUserRole(AssignUserRoleDTO assignUserRoleDTO) {
         log.info(LoggerUser.getEmail() + " is accessing User");
@@ -109,10 +138,35 @@ public class UserService {
         if (optionalUser.isEmpty())
             return new Response<>("User Not Found");
         User user = optionalUser.get();
-        List<Role> updatedRoles = roleRepository.findAllById(assignUserRoleDTO.getRoleUIDS());
+        List<Role> updatedRoles = new ArrayList<>(roleRepository.findAllById(assignUserRoleDTO.getRoleUIDS()));
+        if (!seesAllRoles()) {
+            // The caller (e.g. STAFF) is only shown CEO/MANAGER/CASHIER, so
+            // they can neither hand out a role they can't see nor strip one
+            // the user already holds - those are kept as they were.
+            updatedRoles.removeIf(role -> !STAFF_VISIBLE_ROLE_CODES.contains(role.getCode()));
+            if (user.getRoles() != null) {
+                user.getRoles().stream()
+                        .filter(role -> !STAFF_VISIBLE_ROLE_CODES.contains(role.getCode()))
+                        .forEach(updatedRoles::add);
+            }
+        }
         user.setRoles(updatedRoles);
         return new Response<>(userRepository.save(user));
     }
+    // Mirrors RoleService: ROOT and DIRECTOR manage every role, everyone
+    // else only ever sees/handles the branch-operational ones.
+    private static final List<String> STAFF_VISIBLE_ROLE_CODES = List.of("CEO", "MANAGER", "CASHIER");
+
+    private boolean seesAllRoles() {
+        User loggedUser = LoggerUser.getUser();
+        List<String> roleCodes = loggedUser.getRoles() == null
+                ? List.of()
+                : loggedUser.getRoles().stream().map(Role::getCode).toList();
+        return Boolean.TRUE.equals(loggedUser.getIsRoot())
+                || roleCodes.contains("ROOT")
+                || roleCodes.contains("DIRECTOR");
+    }
+
     public Response<User> enableOrDisableAccount(String userUID, Boolean enable){
         log.info(LoggerUser.getEmail() + "is Enabling or Disabling User Account");
         if(userUID == null || enable == null)

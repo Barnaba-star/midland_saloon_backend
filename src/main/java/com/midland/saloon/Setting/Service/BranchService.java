@@ -3,12 +3,15 @@ import com.midland.saloon.Config.Security.LoggerUser;
 import com.midland.saloon.Setting.Dto.BranchDTO;
 import com.midland.saloon.Setting.Model.Branch;
 import com.midland.saloon.Setting.Model.BranchCodeHelper;
+import com.midland.saloon.Setting.Model.PlatformSetting;
+import com.midland.saloon.Setting.Model.Role;
 import com.midland.saloon.Setting.Projection.BranchProjection;
 import com.midland.saloon.Setting.Repository.BranchRepository;
 import com.midland.saloon.Uaa.Model.User;
 import com.midland.saloon.Uaa.Repository.UserRepository;
 import com.midland.saloon.Utils.Responses.Response;
 import com.midland.saloon.Utils.Responses.ResponseList;
+import com.midland.saloon.Utils.PageableParam;
 import com.midland.saloon.Utils.Responses.ResponsePage;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +21,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -28,6 +33,7 @@ public class BranchService {
     private final BranchRepository branchRepository;
     private final BranchCodeHelper branchCodeHelper;
     private final UserRepository userRepository;
+    private final PlatformSettingService platformSettingService;
     public Response<Branch> saveBranch(BranchDTO branchDTO) {
 
         log.info(LoggerUser.getEmail() + " is saving Branch");
@@ -64,6 +70,10 @@ public class BranchService {
                     return new Response<>("Branch Not Found");
                 }
 
+                if (!canTouch(optionalBranch.get())) {
+                    return new Response<>("Branch Not Found");
+                }
+
                 branch = optionalBranch.get();
 
             }
@@ -76,6 +86,27 @@ public class BranchService {
             else {
 
                 branch = new Branch();
+                branch.setCreatedBy(LoggerUser.getUser().getUid());
+
+                // A new branch starts on the trial rather than with no end
+                // date at all. An open-ended closeSubscription is treated as
+                // unrestricted by the login gate, so without this a branch
+                // nobody got round to putting on a plan used the system free
+                // for good.
+                PlatformSetting platformSetting = platformSettingService.current();
+                Integer trialDays = platformSetting.getTrialDays();
+                if (trialDays != null && trialDays > 0) {
+                    branch.setOpenSubscription(LocalDate.now());
+                    branch.setCloseSubscription(LocalDate.now().plusDays(trialDays));
+                    branch.setSubscriptionStatus("TRIAL");
+                }
+                // Pre-filled so an admin is not typing the same plan onto
+                // every branch; still editable per branch afterwards.
+                if (platformSetting.getDefaultSubscriptionAmount() != null
+                        && platformSetting.getDefaultSubscriptionAmount() > 0) {
+                    branch.setSubscriptionAmount(platformSetting.getDefaultSubscriptionAmount());
+                }
+                branch.setSubscriptionDays(platformSetting.getDefaultSubscriptionDays());
 
                 Integer lastSequence = branchRepository.findLastBranchSequenceByRegion(branchDTO.getRegion());
                 long nextNumber = (lastSequence == null ? 0 : lastSequence) + 1;
@@ -155,31 +186,86 @@ public class BranchService {
         log.info(LoggerUser.getEmail() + " is Accessing Branch");
         if(branchUID == null)
             return new Response<>("Branch UID is required");
+
+        // VIEW_BRANCH is granted to every role (CEO/MANAGER/CASHIER) so the
+        // header can show their own branch's name/subscription. Without this
+        // check, that same permission would let them pass any branchUID and
+        // read any OTHER company's branch too. Only ROOT can look up a
+        // branch that isn't their own; findBranchList/findBranchPage (the
+        // real cross-branch admin views) are separately gated behind
+        // VIEW_ALL_BRANCHES, which non-ROOT roles never get.
+        boolean isRoot = Boolean.TRUE.equals(LoggerUser.getUser().getIsRoot());
+        if (!isRoot && !branchUID.equals(LoggerUser.getBranchUID())) {
+            return new Response<>("Branch Not Found");
+        }
+
         Optional<Branch> optionalBranch = branchRepository.findById(branchUID);
         return optionalBranch.map(Response::new).orElseGet(() -> new Response<>("Branch Not Found"));
     }
-    public ResponsePage<Branch> findBranchPage(int page, int size){
+    // ROOT and DIRECTOR see every branch; anyone else (STAFF) only sees the
+    // ones they registered themselves - one staffer's companies stay hidden
+    // from another's.
+    public boolean seesAllBranches() {
+        User user = LoggerUser.getUser();
+        List<String> roleCodes = user.getRoles() == null
+                ? List.of()
+                : user.getRoles().stream().map(Role::getCode).toList();
+        return Boolean.TRUE.equals(user.getIsRoot())
+                || roleCodes.contains("ROOT")
+                || roleCodes.contains("DIRECTOR");
+    }
+
+    public ResponsePage<Branch> findBranchPage(PageableParam pageableParam){
         log.info(LoggerUser.getEmail() + "is accessing Branch");
-        Pageable pageable = PageRequest.of(page, size);
-        return new ResponsePage<>(branchRepository.findAll(pageable));
+        Pageable pageable = PageRequest.of(
+                pageableParam.getPage() == null ? 0 : pageableParam.getPage(),
+                pageableParam.getSize() == null || pageableParam.getSize() <= 0 ? 10 : pageableParam.getSize()
+        );
+        // Searching must never widen what a STAFF member can see, so the
+        // creator narrowing is applied to the search query too rather than
+        // being swapped out for it.
+        String createdBy = seesAllBranches() ? null : LoggerUser.getUser().getUid();
+        String search = searchTerm(pageableParam);
+        return new ResponsePage<>(branchRepository.searchBranchPage(search, createdBy, pageable));
+    }
+
+    /** Null when nothing was typed, so the query skips the LIKE branches entirely. */
+    private static String searchTerm(PageableParam pageableParam) {
+        String raw = pageableParam.getSearchParam();
+        return raw == null || raw.isBlank() ? null : raw.trim().toLowerCase();
     }
     public Response<Branch> deleteBranch(String branchUID){
         log.info(LoggerUser.getEmail() + "is deleting Branch");
         Optional<Branch> optionalBranch = branchRepository.findById(branchUID);
         if(optionalBranch.isEmpty())
             return new Response<>("Branch Not Found");
+        if (!canTouch(optionalBranch.get()))
+            return new Response<>("Branch Not Found");
         branchRepository.delete(optionalBranch.get());
         return new Response<>(optionalBranch.get());
     }
     public ResponseList<BranchProjection> findBranchList(){
         log.info(LoggerUser.getEmail() + "is accessing Branch");
+        if (!seesAllBranches()) {
+            return new ResponseList<>(branchRepository.findBranchListByCreator(LoggerUser.getUser().getUid()));
+        }
         return new ResponseList<>(branchRepository.findBranchList());
+    }
+
+    // A branch the caller is allowed to act on: their own creation, unless
+    // they see everything anyway.
+    public boolean canTouch(Branch branch) {
+        return seesAllBranches()
+                || LoggerUser.getUser().getUid().equals(branch.getCreatedBy());
     }
 
     public ResponseList<User> findAllUsersWithBranchAndRoles(String branchUID){
         log.info(LoggerUser.getEmail() + "is accessing User and Branch");
         if(branchUID==null)
             return new ResponseList<>("Provide Branch REF");
+        Optional<Branch> optionalBranch = branchRepository.findById(branchUID);
+        if(optionalBranch.isEmpty() || !canTouch(optionalBranch.get()))
+            return new ResponseList<>("Branch Not Found");
         return new ResponseList<>(userRepository.findAllUsersWithBranchAndRoles(branchUID));
     }
 }

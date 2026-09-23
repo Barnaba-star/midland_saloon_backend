@@ -32,24 +32,28 @@ public class BranchController {
         return branchService.findBranchByUID(branchUID);
     }
 
-    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_BRANCH')")
+    // Cross-branch admin views (every branch, not just your own) - ROOT-only
+    // in practice, since VIEW_ALL_BRANCHES is never assigned to CEO/MANAGER/
+    // CASHIER roles. Kept separate from VIEW_BRANCH, which every role has
+    // just to see their own branch's name/subscription in the header.
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_ALL_BRANCHES')")
     @PostMapping ("/findBranchPage")
     public ResponsePage<Branch> findBranchPage(@RequestBody PageableParam pageableParam){
-        return branchService.findBranchPage(pageableParam.getPage(), pageableParam.getSize());
+        return branchService.findBranchPage(pageableParam);
     }
     @PreAuthorize("@authChecker.hasPermissionOrRoot('DELETE_BRANCH')")
     @PostMapping ("/deleteBranch/{branchUID}")
     public Response<Branch> deleteBranch(@PathVariable String branchUID){
         return branchService.deleteBranch(branchUID);
     }
-    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_BRANCH')")
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_ALL_BRANCHES')")
     @GetMapping ("/findBranchList")
     public ResponseList<BranchProjection> findBranchList(){
         return branchService.findBranchList();
     }
 
 
-    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_BRANCH')")
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_ALL_BRANCHES')")
     @GetMapping ("/findAllUsersWithBranchAndRoles/{branchUID}")
     public ResponseList<User> findAllUsersWithBranchAndRoles(@PathVariable String branchUID){
         return branchService.findAllUsersWithBranchAndRoles(branchUID);
