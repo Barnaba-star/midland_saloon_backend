@@ -175,32 +175,40 @@ public class RevenueShareService {
      * disagree about what is still owed.
      */
     @Transactional
-    public Response<String> payShare(String role, String uid, Integer year, Integer month, String note, Integer amount) {
+    /**
+     * Records a payout against one person's share.
+     *
+     * Returns a code rather than a sentence: the wording a person reads
+     * belongs to the screen, which has it translated. The amount actually
+     * recorded comes back on success so the caller can update in place
+     * instead of refetching.
+     */
+    public Response<Integer> payShare(String role, String uid, Integer year, Integer month, String note, Integer amount) {
         String wanted = role == null ? "" : role.trim().toUpperCase();
         if (uid == null || uid.isBlank()) {
-            return new Response<>("Provide the person to pay");
+            return new Response<>("NO_RECIPIENT");
         }
 
         if (STAFF_ROLE_CODE.equals(wanted)) {
             Response<CommissionPayout> paid = commissionService.payStaffCommission(uid, year, month, note, amount);
             return paid.getData() != null
-                    ? new Response<>("Payout recorded")
-                    : new Response<>(paid.getMessage());
+                    ? new Response<>(paid.getData().getAmount())
+                    : new Response<>(codeFor(paid.getMessage()));
         }
 
         if (!DIRECTOR_ROLE_CODE.equals(wanted) && !ROOT_ROLE_CODE.equals(wanted)) {
-            return new Response<>("Unknown share");
+            return new Response<>("UNKNOWN_SHARE");
         }
 
-        // Directors and ROOT are paid from the platform's own income, so only
-        // ROOT records these - a director settling their own share would be
-        // signing their own cheque.
+        // ROOT and DIRECTOR both record these. A director settling their own
+        // share is a conflict on paper, but the audit log names whoever
+        // pressed the button - the trail is the control here, not the lock.
         User payer = LoggerUser.getUser();
-        boolean isRoot = Boolean.TRUE.equals(payer.getIsRoot())
+        boolean mayPay = Boolean.TRUE.equals(payer.getIsRoot())
                 || (payer.getRoles() != null && payer.getRoles().stream()
-                        .anyMatch(r -> ROOT_ROLE_CODE.equals(r.getCode())));
-        if (!isRoot) {
-            return new Response<>("Only ROOT can record this payout");
+                        .anyMatch(r -> ROOT_ROLE_CODE.equals(r.getCode()) || DIRECTOR_ROLE_CODE.equals(r.getCode())));
+        if (!mayPay) {
+            return new Response<>("NOT_ALLOWED");
         }
 
         YearMonth period = (year == null || month == null) ? YearMonth.now() : YearMonth.of(year, month);
@@ -212,20 +220,18 @@ public class RevenueShareService {
                 .orElse(null);
 
         if (recipient == null) {
-            return new Response<>("This person does not hold that role");
+            return new Response<>("NOT_IN_ROLE");
         }
         if (recipient.getOutstanding() <= 0) {
-            return new Response<>(recipient.getAmount() <= 0
-                    ? "Nothing was earned for this share in this period"
-                    : "This share has already been paid");
+            return new Response<>(recipient.getAmount() <= 0 ? "NOTHING_EARNED" : "ALREADY_PAID");
         }
 
         long paying = amount == null ? recipient.getOutstanding() : amount;
         if (paying <= 0) {
-            return new Response<>("Provide an amount greater than zero");
+            return new Response<>("INVALID_AMOUNT");
         }
         if (paying > recipient.getOutstanding()) {
-            return new Response<>("That is more than is owed for this period");
+            return new Response<>("MORE_THAN_OWED");
         }
 
         CommissionPayout payout = new CommissionPayout();
@@ -241,7 +247,22 @@ public class RevenueShareService {
         payout.setPaidByName(displayName(payer));
 
         commissionPayoutRepository.save(payout);
-        return new Response<>("Payout recorded");
+        return new Response<>((int) paying);
+    }
+
+    /**
+     * The commission service still answers in sentences, since its own screen
+     * shows them. Mapped here so this endpoint speaks only in codes.
+     */
+    private static String codeFor(String message) {
+        String text = message == null ? "" : message.toLowerCase();
+        if (text.contains("already been paid")) return "ALREADY_PAID";
+        if (text.contains("earned no commission")) return "NOTHING_EARNED";
+        if (text.contains("more than is owed")) return "MORE_THAN_OWED";
+        if (text.contains("greater than zero")) return "INVALID_AMOUNT";
+        if (text.contains("not allowed")) return "NOT_ALLOWED";
+        if (text.contains("not found")) return "NOT_IN_ROLE";
+        return "PAY_FAILED";
     }
 
 }

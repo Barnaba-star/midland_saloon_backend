@@ -77,7 +77,7 @@ public class PaymentController {
     /** Records that one person's share for the month has been handed over. */
     @PreAuthorize("@authChecker.hasPermissionOrRoot('PAY_COMMISSION')")
     @PostMapping("/payShare/{role}/{uid}")
-    public Response<String> payShare(
+    public Response<Integer> payShare(
             @PathVariable String role,
             @PathVariable String uid,
             @RequestParam(required = false) Integer year,
