@@ -3,7 +3,9 @@ package com.midland.saloon.Payment.Controller;
 import com.midland.saloon.Payment.Model.SubscriptionPayment;
 import com.midland.saloon.Payment.Projection.PaymentTotalsProjection;
 import com.midland.saloon.Payment.Repository.SubscriptionPaymentRepository;
+import com.midland.saloon.Payment.Dto.RevenueShareDTO;
 import com.midland.saloon.Payment.Service.PaymentReconcileService;
+import com.midland.saloon.Payment.Service.RevenueShareService;
 import com.midland.saloon.Setting.Model.Branch;
 import com.midland.saloon.Utils.PageableParam;
 import com.midland.saloon.Utils.Responses.Response;
@@ -24,6 +26,7 @@ public class PaymentController {
 
     private final SubscriptionPaymentRepository subscriptionPaymentRepository;
     private final PaymentReconcileService paymentReconcileService;
+    private final RevenueShareService revenueShareService;
 
     /** Money in: every subscription payment that actually completed. */
     @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_PAYMENTS')")
@@ -47,6 +50,16 @@ public class PaymentController {
 
     private static long orZero(Long value) {
         return value == null ? 0L : value;
+    }
+
+    /** How a month's takings divide between the people running the platform. */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_PAYMENTS')")
+    @GetMapping("/findRevenueShare")
+    public Response<RevenueShareDTO> findRevenueShare(
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month
+    ) {
+        return revenueShareService.findRevenueShare(year, month);
     }
 
     /** Payments started and never resolved - the ones worth chasing. */

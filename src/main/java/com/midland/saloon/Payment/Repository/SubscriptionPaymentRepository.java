@@ -77,4 +77,15 @@ public interface SubscriptionPaymentRepository extends JpaRepository<Subscriptio
             WHERE p.paidAt >= :start
             """)
     long amountSince(@Param("start") java.time.LocalDate start);
+
+    // A month's takings and the staff commission already carved out of them.
+    @Query("""
+            SELECT COALESCE(SUM(p.amount), 0) AS totalAmount,
+                   COALESCE(SUM(p.commissionAmount), 0) AS totalCommission,
+                   COUNT(p) AS payments
+            FROM SubscriptionPayment p
+            WHERE p.paidAt >= :start AND p.paidAt <= :end
+            """)
+    PaymentTotalsProjection totalsBetween(@Param("start") java.time.LocalDate start,
+                                          @Param("end") java.time.LocalDate end);
 }

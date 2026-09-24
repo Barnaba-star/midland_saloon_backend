@@ -31,6 +31,14 @@ public class PlatformSetting extends BaseEntity {
     @Column(name = "commission_percent")
     private Integer commissionPercent = 10;
 
+    /** Share of a month's takings each DIRECTOR is due. Multiplied by how many hold the role. */
+    @Column(name = "director_percent")
+    private Integer directorPercent = 10;
+
+    /** Share of a month's takings ROOT is due. */
+    @Column(name = "root_percent")
+    private Integer rootPercent = 25;
+
     /** Free days a newly registered branch gets before it has to pay. */
     @Column(name = "trial_days")
     private Integer trialDays = 30;

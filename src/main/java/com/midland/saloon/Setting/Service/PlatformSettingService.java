@@ -61,6 +61,8 @@ public class PlatformSettingService {
                 .orElseGet(PlatformSetting::new);
 
         setting.setCommissionPercent(incoming.getCommissionPercent());
+        setting.setDirectorPercent(incoming.getDirectorPercent());
+        setting.setRootPercent(incoming.getRootPercent());
         setting.setTrialDays(incoming.getTrialDays());
         setting.setGracePeriodDays(incoming.getGracePeriodDays());
         setting.setMinimumPaymentAmount(incoming.getMinimumPaymentAmount());
@@ -78,12 +80,41 @@ public class PlatformSettingService {
         return new Response<>(saved);
     }
 
-    /** Seeded once so the screen has a row to edit rather than an empty form. */
+    /**
+     * Seeded once so the screen has a row to edit rather than an empty form,
+     * and any column added since that row was written is filled in with its
+     * default. Field initialisers only run for new instances, so without this
+     * a setting added later reads as null - which quietly becomes zero, and a
+     * zero percentage pays nobody.
+     */
     @Transactional
     public void seedIfMissing() {
-        if (platformSettingRepository.findFirstByIsActiveTrue().isEmpty()) {
+        PlatformSetting setting = platformSettingRepository.findFirstByIsActiveTrue().orElse(null);
+        if (setting == null) {
             platformSettingRepository.save(new PlatformSetting());
             log.info("Seeded platform settings with default values");
+            cached = null;
+            return;
+        }
+
+        PlatformSetting defaults = new PlatformSetting();
+        boolean changed = false;
+        if (setting.getCommissionPercent() == null) { setting.setCommissionPercent(defaults.getCommissionPercent()); changed = true; }
+        if (setting.getDirectorPercent() == null) { setting.setDirectorPercent(defaults.getDirectorPercent()); changed = true; }
+        if (setting.getRootPercent() == null) { setting.setRootPercent(defaults.getRootPercent()); changed = true; }
+        if (setting.getTrialDays() == null) { setting.setTrialDays(defaults.getTrialDays()); changed = true; }
+        if (setting.getGracePeriodDays() == null) { setting.setGracePeriodDays(defaults.getGracePeriodDays()); changed = true; }
+        if (setting.getMinimumPaymentAmount() == null) { setting.setMinimumPaymentAmount(defaults.getMinimumPaymentAmount()); changed = true; }
+        if (setting.getDefaultSubscriptionAmount() == null) { setting.setDefaultSubscriptionAmount(defaults.getDefaultSubscriptionAmount()); changed = true; }
+        if (setting.getDefaultSubscriptionDays() == null) { setting.setDefaultSubscriptionDays(defaults.getDefaultSubscriptionDays()); changed = true; }
+        if (setting.getSessionHours() == null) { setting.setSessionHours(defaults.getSessionHours()); changed = true; }
+        if (setting.getErrorRetentionDays() == null) { setting.setErrorRetentionDays(defaults.getErrorRetentionDays()); changed = true; }
+        if (setting.getErrorPurgeDays() == null) { setting.setErrorPurgeDays(defaults.getErrorPurgeDays()); changed = true; }
+        if (setting.getAuditRetentionDays() == null) { setting.setAuditRetentionDays(defaults.getAuditRetentionDays()); changed = true; }
+
+        if (changed) {
+            platformSettingRepository.save(setting);
+            log.info("Filled in platform settings added since this row was written");
         }
         cached = null;
     }
@@ -93,6 +124,12 @@ public class PlatformSettingService {
         // one would take money off the staff member.
         if (outside(s.getCommissionPercent(), 0, 100)) {
             return "Commission percent must be between 0 and 100";
+        }
+        if (outside(s.getDirectorPercent(), 0, 100)) {
+            return "Director percent must be between 0 and 100";
+        }
+        if (outside(s.getRootPercent(), 0, 100)) {
+            return "Root percent must be between 0 and 100";
         }
         if (outside(s.getTrialDays(), 0, 365)) {
             return "Trial days must be between 0 and 365";
