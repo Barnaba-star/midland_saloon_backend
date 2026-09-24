@@ -4,6 +4,7 @@ import com.midland.saloon.Config.Security.LoggerUser;
 import com.midland.saloon.Monitoring.Dto.ClientErrorDTO;
 import com.midland.saloon.Monitoring.Model.ErrorLog;
 import com.midland.saloon.Monitoring.Repository.ErrorLogRepository;
+import com.midland.saloon.Monitoring.Support.SensitiveData;
 import com.midland.saloon.Utils.PageableParam;
 import com.midland.saloon.Utils.Responses.Response;
 import com.midland.saloon.Utils.Responses.ResponsePage;
@@ -22,7 +23,6 @@ import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 @Service
 @Log
@@ -40,12 +40,6 @@ public class ErrorLogService {
     private static final int MAX_MESSAGE = 2000;
     private static final int MAX_PAYLOAD = 8000;
 
-    // "password": "x"  ->  "password": "***"   (also token, secret, apiKey, ...)
-    private static final Pattern SENSITIVE_FIELD = Pattern.compile(
-            "(\"(?:[^\"]*(?:password|passcode|token|secret|apikey|api_key|authorization|credential)[^\"]*)\"\\s*:\\s*)\"[^\"]*\"",
-            Pattern.CASE_INSENSITIVE
-    );
-
     private final ErrorLogRepository errorLogRepository;
 
     /**
@@ -60,15 +54,15 @@ public class ErrorLogService {
             errorLog.setSource(SOURCE_BACKEND);
             errorLog.setLevel(level);
             errorLog.setOccurredAt(LocalDateTime.now());
-            errorLog.setMessage(truncate(throwable.getMessage(), MAX_MESSAGE));
+            errorLog.setMessage(SensitiveData.truncate(throwable.getMessage(), MAX_MESSAGE));
             errorLog.setExceptionType(throwable.getClass().getName());
-            errorLog.setStackTrace(truncate(stackTraceOf(throwable), MAX_STACK_TRACE));
+            errorLog.setStackTrace(SensitiveData.truncate(stackTraceOf(throwable), MAX_STACK_TRACE));
             if (request != null) {
-                errorLog.setPath(truncate(request.getRequestURI(), 500));
+                errorLog.setPath(SensitiveData.truncate(request.getRequestURI(), 500));
                 errorLog.setHttpMethod(request.getMethod());
-                errorLog.setUserAgent(truncate(request.getHeader("User-Agent"), 500));
-                errorLog.setQueryString(truncate(request.getQueryString(), 2000));
-                errorLog.setPayload(truncate(redact(readBody(request)), MAX_PAYLOAD));
+                errorLog.setUserAgent(SensitiveData.truncate(request.getHeader("User-Agent"), 500));
+                errorLog.setQueryString(SensitiveData.truncate(request.getQueryString(), 2000));
+                errorLog.setPayload(SensitiveData.truncate(SensitiveData.redact(readBody(request)), MAX_PAYLOAD));
             }
             applyCurrentUser(errorLog);
             errorLogRepository.save(errorLog);
@@ -86,14 +80,14 @@ public class ErrorLogService {
             errorLog.setSource(SOURCE_FRONTEND);
             errorLog.setLevel(dto.getLevel() == null ? LEVEL_ERROR : dto.getLevel());
             errorLog.setOccurredAt(LocalDateTime.now());
-            errorLog.setMessage(truncate(dto.getMessage(), MAX_MESSAGE));
-            errorLog.setExceptionType(truncate(dto.getExceptionType(), 255));
-            errorLog.setStackTrace(truncate(dto.getStackTrace(), MAX_STACK_TRACE));
-            errorLog.setPath(truncate(dto.getPath(), 500));
+            errorLog.setMessage(SensitiveData.truncate(dto.getMessage(), MAX_MESSAGE));
+            errorLog.setExceptionType(SensitiveData.truncate(dto.getExceptionType(), 255));
+            errorLog.setStackTrace(SensitiveData.truncate(dto.getStackTrace(), MAX_STACK_TRACE));
+            errorLog.setPath(SensitiveData.truncate(dto.getPath(), 500));
             errorLog.setHttpMethod(dto.getHttpMethod());
-            errorLog.setPayload(truncate(redact(dto.getPayload()), MAX_PAYLOAD));
+            errorLog.setPayload(SensitiveData.truncate(SensitiveData.redact(dto.getPayload()), MAX_PAYLOAD));
             if (request != null) {
-                errorLog.setUserAgent(truncate(request.getHeader("User-Agent"), 500));
+                errorLog.setUserAgent(SensitiveData.truncate(request.getHeader("User-Agent"), 500));
             }
             applyCurrentUser(errorLog);
             errorLogRepository.save(errorLog);
@@ -161,30 +155,10 @@ public class ErrorLogService {
         return new String(body, StandardCharsets.UTF_8);
     }
 
-    /**
-     * Masks the values of anything that looks like a credential, so a recorded
-     * login attempt never carries the password with it. Deliberately a text
-     * match rather than a JSON parse: a malformed body is exactly the case
-     * worth recording, and that one will not parse.
-     */
-    static String redact(String payload) {
-        if (payload == null || payload.isBlank()) {
-            return null;
-        }
-        return SENSITIVE_FIELD.matcher(payload).replaceAll("$1\"***\"");
-    }
-
     private static String stackTraceOf(Throwable throwable) {
         StringWriter stringWriter = new StringWriter();
         throwable.printStackTrace(new PrintWriter(stringWriter));
         return stringWriter.toString();
-    }
-
-    private static String truncate(String value, int max) {
-        if (value == null) {
-            return null;
-        }
-        return value.length() <= max ? value : value.substring(0, max);
     }
 
     private static String blankToNull(String value) {

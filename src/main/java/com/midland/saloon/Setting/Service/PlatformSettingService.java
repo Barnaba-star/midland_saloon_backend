@@ -69,6 +69,7 @@ public class PlatformSettingService {
         setting.setSessionHours(incoming.getSessionHours());
         setting.setErrorRetentionDays(incoming.getErrorRetentionDays());
         setting.setErrorPurgeDays(incoming.getErrorPurgeDays());
+        setting.setAuditRetentionDays(incoming.getAuditRetentionDays());
         setting.update();
 
         PlatformSetting saved = platformSettingRepository.save(setting);
@@ -118,6 +119,9 @@ public class PlatformSettingService {
         }
         if (outside(s.getErrorPurgeDays(), 1, 3650)) {
             return "Error purge days must be between 1 and 3650";
+        }
+        if (outside(s.getAuditRetentionDays(), 30, 3650)) {
+            return "Audit retention days must be between 30 and 3650";
         }
         // Purging before hiding would delete rows that are still on screen.
         if (s.getErrorPurgeDays() < s.getErrorRetentionDays()) {

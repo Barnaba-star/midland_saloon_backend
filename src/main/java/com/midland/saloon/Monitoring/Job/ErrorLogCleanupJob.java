@@ -1,5 +1,6 @@
 package com.midland.saloon.Monitoring.Job;
 
+import com.midland.saloon.Monitoring.Repository.AuditLogRepository;
 import com.midland.saloon.Monitoring.Repository.ErrorLogRepository;
 import com.midland.saloon.Setting.Model.PlatformSetting;
 import com.midland.saloon.Setting.Service.PlatformSettingService;
@@ -22,6 +23,7 @@ import java.time.LocalDateTime;
 public class ErrorLogCleanupJob {
 
     private final ErrorLogRepository errorLogRepository;
+    private final AuditLogRepository auditLogRepository;
     private final PlatformSettingService platformSettingService;
 
     @Scheduled(cron = "0 30 1 * * *") // once a day, 01:30 - after the subscription job
@@ -33,6 +35,13 @@ public class ErrorLogCleanupJob {
         int purged = errorLogRepository.purgeOlderThan(now.minusDays(setting.getErrorPurgeDays()));
         if (hidden > 0 || purged > 0) {
             log.info("Error log cleanup: hidden=" + hidden + " purged=" + purged);
+        }
+
+        // Audit entries are never soft-deleted - there is nothing to "clear",
+        // they simply age out.
+        int auditPurged = auditLogRepository.purgeOlderThan(now.minusDays(setting.getAuditRetentionDays()));
+        if (auditPurged > 0) {
+            log.info("Audit log cleanup: purged=" + auditPurged);
         }
     }
 }

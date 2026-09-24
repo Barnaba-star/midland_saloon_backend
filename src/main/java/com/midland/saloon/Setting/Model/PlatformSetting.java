@@ -61,4 +61,8 @@ public class PlatformSetting extends BaseEntity {
     /** Days before a cleared error is deleted for good. */
     @Column(name = "error_purge_days")
     private Integer errorPurgeDays = 90;
+
+    /** Days an audit entry is kept. Longer than errors - it is a record, not a symptom. */
+    @Column(name = "audit_retention_days")
+    private Integer auditRetentionDays = 365;
 }
