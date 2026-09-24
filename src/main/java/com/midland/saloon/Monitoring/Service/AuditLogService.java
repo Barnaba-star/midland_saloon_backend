@@ -1,5 +1,6 @@
 package com.midland.saloon.Monitoring.Service;
 
+import com.midland.saloon.Config.Security.LoggerUser;
 import com.midland.saloon.Monitoring.Model.AuditLog;
 import com.midland.saloon.Monitoring.Repository.AuditLogRepository;
 import com.midland.saloon.Monitoring.Support.SensitiveData;
@@ -22,6 +23,12 @@ import java.util.Map;
 public class AuditLogService {
 
     private static final int MAX_PAYLOAD = 8000;
+
+    /**
+     * Nothing from the last month can be removed, whoever asks. A trail that
+     * can be cleared the same week is not one.
+     */
+    private static final int MIN_PURGE_DAYS = 30;
 
     public static final String SUCCESS = "SUCCESS";
     public static final String FAILED = "FAILED";
@@ -120,4 +127,34 @@ public class AuditLogService {
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
     }
+
+    /**
+     * Removes entries older than a number of days.
+     *
+     * Deliberately by age and nothing else. There is no way to delete one row
+     * or to empty the table: either would let somebody erase the record of
+     * what they had just done, which is the only thing an audit log is for.
+     * Old entries are a storage question; recent ones are the evidence.
+     */
+    @Transactional
+    public Response<Integer> purgeOlderThan(Integer days) {
+        if (days == null || days < MIN_PURGE_DAYS) {
+            return new Response<>("Entries newer than " + MIN_PURGE_DAYS + " days cannot be removed");
+        }
+        int removed = auditLogRepository.purgeOlderThan(LocalDateTime.now().minusDays(days));
+        log.info(LoggerUser.getEmail() + " purged " + removed + " audit entries older than " + days + " days");
+        return new Response<>(removed);
+    }
+
+    /** How much is sitting there, so the decision is an informed one. */
+    public Response<Map<String, Long>> findAuditStorage() {
+        LocalDateTime now = LocalDateTime.now();
+        return new Response<>(Map.of(
+                "total", auditLogRepository.count(),
+                "olderThan30", auditLogRepository.countOlderThan(now.minusDays(30)),
+                "olderThan90", auditLogRepository.countOlderThan(now.minusDays(90)),
+                "olderThan365", auditLogRepository.countOlderThan(now.minusDays(365))
+        ));
+    }
+
 }

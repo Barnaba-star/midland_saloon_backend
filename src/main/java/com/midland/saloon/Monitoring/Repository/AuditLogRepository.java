@@ -34,6 +34,9 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, String> {
     @Query("SELECT COUNT(a) FROM AuditLog a WHERE a.occurredAt >= :since")
     long countSince(@Param("since") LocalDateTime since);
 
+    @Query("SELECT COUNT(a) FROM AuditLog a WHERE a.occurredAt < :cutoff")
+    long countOlderThan(@Param("cutoff") LocalDateTime cutoff);
+
     @Query("SELECT COUNT(DISTINCT a.username) FROM AuditLog a WHERE a.occurredAt >= :since")
     long countActiveUsersSince(@Param("since") LocalDateTime since);
 

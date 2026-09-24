@@ -12,8 +12,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 /**
- * Read-only on purpose. There is no endpoint to clear this: a trail that can
- * be tidied away from the screen is worth less than one that cannot.
+ * Reading, and removing by age. There is no endpoint that deletes one entry
+ * or empties the table - either would let somebody erase the record of what
+ * they had just done.
  */
 @RestController
 @RequestMapping("/audit")
@@ -30,6 +31,19 @@ public class AuditLogController {
             @RequestParam(required = false) String outcome
     ) {
         return auditLogService.findAuditPage(pageableParam, username, outcome);
+    }
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_AUDIT_LOG')")
+    @GetMapping("/findAuditStorage")
+    public Response<Map<String, Long>> findAuditStorage() {
+        return auditLogService.findAuditStorage();
+    }
+
+    /** Removing by age only - never a single entry, never all of them. */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('PURGE_AUDIT_LOG')")
+    @PostMapping("/purgeAuditLog")
+    public Response<Integer> purgeAuditLog(@RequestParam Integer days) {
+        return auditLogService.purgeOlderThan(days);
     }
 
     @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_AUDIT_LOG')")

@@ -90,7 +90,25 @@ public class AuditLogFilter extends OncePerRequestFilter {
             return false;
         }
         String path = request.getRequestURI();
-        return IGNORED.stream().noneMatch(path::startsWith);
+        if (IGNORED.stream().anyMatch(path::startsWith)) {
+            return false;
+        }
+        return !isRead(path);
+    }
+
+    /**
+     * This API posts its searches, because they carry a PageableParam in the
+     * body - so "POST" is not the same as "changed something" here. Every one
+     * of them is named find*, and nothing that changes anything is, so the
+     * name is what decides.
+     *
+     * Without this the log filled with people looking at pages: opening the
+     * audit screen wrote an audit row about opening the audit screen.
+     */
+    private static boolean isRead(String path) {
+        int lastSlash = path.lastIndexOf('/');
+        String endpoint = lastSlash < 0 ? path : path.substring(lastSlash + 1);
+        return endpoint.toLowerCase().startsWith("find");
     }
 
     private void write(HttpServletRequest request, HttpServletResponse response, long durationMs) {
