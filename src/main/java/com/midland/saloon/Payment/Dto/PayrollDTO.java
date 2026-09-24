@@ -22,9 +22,23 @@ public class PayrollDTO {
     /** The month's subscription income the shares were worked out from. */
     private long revenue;
 
+    /**
+     * The split the lines below come from - what the month gave each role
+     * before it is broken down by person. Without it the page shows totals
+     * with nothing to check them against.
+     */
+    private RevenueShareDTO share;
+
+    /** What the month owes in total, before anything already settled. */
+    private long totalEarned;
+
+    /** What is left to send, once payments already recorded are taken off. */
     private long totalToPay;
 
     private int recipients;
+
+    /** How many of those have already been settled in full. */
+    private int settled;
 
     /**
      * How many of those have no phone number on file. A bank needs one, so

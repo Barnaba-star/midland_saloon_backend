@@ -27,10 +27,10 @@ import java.util.Map;
  * ways of arriving at the same figure would eventually disagree in front of
  * a bank teller. This reads that answer and lays it out to be printed.
  *
- * What it does add is the difference between what someone earned and what
- * they are still owed. A sheet handed to a bank is an instruction to send
- * money, so it carries what is outstanding, not what was earned - otherwise
- * anyone already settled would be paid twice.
+ * What it adds is the person-by-person view of that split, and the
+ * difference between what the month earned somebody and what is left to
+ * send them. Both are on the sheet: the first is what the month decided,
+ * the second is what the bank is being asked to do about it.
  */
 @Slf4j
 @Service
@@ -57,10 +57,14 @@ public class PayrollService {
                 continue;
             }
             for (ShareRecipientDTO recipient : recipients) {
-                // Nothing outstanding is nothing to instruct the bank to do.
-                // Someone who earned nothing this month, or who has already
-                // been settled, does not belong on a payment schedule.
-                if (recipient.getOutstanding() <= 0) {
+                // Everyone the month earned something goes on the sheet,
+                // including those already settled. Listing only what is left
+                // to send hid the very thing this page is for: with staff and
+                // directors already paid, the month's split showed as a
+                // single line and the breakdown was nowhere. Settled people
+                // are shown with nothing left to send, which is an answer;
+                // leaving them out was not.
+                if (recipient.getAmount() <= 0) {
                     continue;
                 }
                 PayrollLineDTO line = new PayrollLineDTO();
@@ -76,11 +80,12 @@ public class PayrollService {
 
         attachContactDetails(lines);
 
-        // Sorted within a role by what is owed, largest first: the lines that
-        // matter most on a payment run are the ones read first.
+        // Sorted within a role by what the month earned them, largest first.
+        // Earned rather than outstanding, so the order does not rearrange
+        // itself as people are paid.
         lines.sort((a, b) -> {
             int byRole = Integer.compare(ROLES.indexOf(a.getRole()), ROLES.indexOf(b.getRole()));
-            return byRole != 0 ? byRole : Long.compare(b.getToPay(), a.getToPay());
+            return byRole != 0 ? byRole : Long.compare(b.getEarned(), a.getEarned());
         });
 
         RevenueShareDTO share = revenueShareService
@@ -91,9 +96,12 @@ public class PayrollService {
         payroll.setMonth(period.getMonthValue());
         payroll.setGeneratedAt(LocalDateTime.now());
         payroll.setRevenue(share == null ? 0 : share.getRevenue());
+        payroll.setShare(share);
         payroll.setLines(lines);
         payroll.setRecipients(lines.size());
+        payroll.setTotalEarned(lines.stream().mapToLong(PayrollLineDTO::getEarned).sum());
         payroll.setTotalToPay(lines.stream().mapToLong(PayrollLineDTO::getToPay).sum());
+        payroll.setSettled((int) lines.stream().filter(line -> line.getToPay() <= 0).count());
         payroll.setMissingPhone((int) lines.stream()
                 .filter(line -> line.getPhone() == null || line.getPhone().isBlank())
                 .count());
