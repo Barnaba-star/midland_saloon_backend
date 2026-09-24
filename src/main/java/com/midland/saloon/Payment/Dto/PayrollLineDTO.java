@@ -21,11 +21,11 @@ public class PayrollLineDTO {
 
     private String phone;
 
-    /**
-     * Where the money goes. Not yet collected anywhere, so null for now -
-     * the column is here so the sheet does not change shape the day it is.
-     */
+    /** Where the money goes - set by its owner, on their own profile. */
     private String accountNumber;
+
+    /** And which bank it is at; an account number alone cannot be paid to. */
+    private String bankName;
 
     /** What the month earned them. */
     private long earned;

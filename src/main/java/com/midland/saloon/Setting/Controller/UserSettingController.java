@@ -3,7 +3,7 @@ package com.midland.saloon.Setting.Controller;
 import com.midland.saloon.Setting.Dto.UserSettingDTo;
 import com.midland.saloon.Uaa.Dto.AssignUserRoleDTO;
 import com.midland.saloon.Uaa.Dto.UserAndAttachmentDTO;
-import com.midland.saloon.Uaa.Dto.AccountNumberDTO;
+import com.midland.saloon.Uaa.Dto.BankDetailsDTO;
 import com.midland.saloon.Uaa.Dto.SavedUserDTO;
 import com.midland.saloon.Uaa.Dto.UserDTO;
 import com.midland.saloon.Uaa.Model.User;
@@ -71,24 +71,24 @@ public class UserSettingController {
     }
 
     /**
-     * The caller's own account number. findUserByUID needs VIEW_USER, which
-     * a cashier does not have - so reading your own bank details would have
-     * been refused on the way into your own profile.
+     * The caller's own bank details. findUserByUID needs VIEW_USER, which a
+     * cashier does not have - so reading your own would have been refused on
+     * the way into your own profile.
      */
-    @GetMapping("/findMyAccountNumber")
-    public Response<String> findMyAccountNumber(){
-        return userService.findMyAccountNumber();
+    @GetMapping("/findMyBankDetails")
+    public Response<BankDetailsDTO> findMyBankDetails(){
+        return userService.findMyBankDetails();
     }
 
     /**
-     * Deliberately ungated: anyone signed in may set their own account
-     * number, and the service refuses somebody else's without SAVE_USER.
-     * A @PreAuthorize here would stop a staff member filling in their own.
+     * Deliberately ungated: anyone signed in may set their own bank details,
+     * and the service refuses somebody else's without SAVE_USER. A
+     * @PreAuthorize here would stop a staff member filling in their own.
      */
-    @PostMapping("/saveAccountNumber/{userUID}")
-    public Response<String> saveAccountNumber(@PathVariable String userUID,
-                                              @RequestBody AccountNumberDTO dto){
-        return userService.saveAccountNumber(userUID, dto == null ? null : dto.getAccountNumber());
+    @PostMapping("/saveBankDetails/{userUID}")
+    public Response<String> saveBankDetails(@PathVariable String userUID,
+                                            @RequestBody BankDetailsDTO dto){
+        return userService.saveBankDetails(userUID, dto);
     }
 
     @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_USER')")

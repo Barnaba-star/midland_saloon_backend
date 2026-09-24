@@ -75,6 +75,9 @@ public class UserService {
         if (userDTO.getAccountNumber() != null) {
             user.setAccountNumber(userDTO.getAccountNumber().trim());
         }
+        if (userDTO.getBankName() != null) {
+            user.setBankName(userDTO.getBankName().trim());
+        }
         Branch branch= null;
         if(userDTO.getBranch() !=null){
             Optional<Branch> optionalBranch = branchRepository.findById(userDTO.getBranch());
@@ -226,27 +229,30 @@ public class UserService {
         return response;
     }
 
-    /** The caller's own, so a profile can show it without VIEW_USER. */
-    public Response<String> findMyAccountNumber() {
+    /** The caller's own, so a profile can show them without VIEW_USER. */
+    public Response<BankDetailsDTO> findMyBankDetails() {
         User caller = LoggerUser.getUser();
         Optional<User> user = userRepository.findById(caller.getUid());
         if (user.isEmpty()) {
             return new Response<>("User Not Found");
         }
-        String number = user.get().getAccountNumber();
-        return data(number == null ? "" : number);
+        return new Response<>(new BankDetailsDTO(
+                user.get().getAccountNumber(),
+                user.get().getBankName()
+        ));
     }
 
     /**
-     * Sets where somebody's payroll money is sent.
+     * Sets where somebody's payroll money is sent - account number and bank
+     * together.
      *
      * Anyone may set their own; changing somebody else's needs SAVE_USER.
      * It is a narrow endpoint rather than part of saveUser because the
      * screens that call it hold one field, and a full save from a form that
      * does not carry the rest would quietly blank it.
      */
-    public Response<String> saveAccountNumber(String userUID, String accountNumber) {
-        log.info(LoggerUser.getEmail() + " is setting an account number");
+    public Response<String> saveBankDetails(String userUID, BankDetailsDTO details) {
+        log.info(LoggerUser.getEmail() + " is setting bank details");
 
         User caller = LoggerUser.getUser();
         String target = userUID == null || userUID.isBlank() ? caller.getUid() : userUID;
@@ -260,20 +266,36 @@ public class UserService {
             return new Response<>("User Not Found");
         }
 
-        String cleaned = accountNumber == null ? null : accountNumber.trim();
-        if (cleaned != null && cleaned.isEmpty()) {
-            // Clearing it is a real choice - somebody who changed bank and has
-            // not got the new number yet should not be left with the old one.
-            cleaned = null;
-        }
-        if (cleaned != null && cleaned.length() > 50) {
+        // Clearing them is a real choice - somebody who changed bank and has
+        // not got the new number yet should not be left with the old one.
+        String number = blankToNull(details == null ? null : details.getAccountNumber());
+        String bank = blankToNull(details == null ? null : details.getBankName());
+
+        if (number != null && number.length() > 50) {
             return data("TOO_LONG");
+        }
+        if (bank != null && bank.length() > 100) {
+            return data("TOO_LONG");
+        }
+        // One without the other cannot be paid to, so it is not a saveable
+        // state - better refused here than found out at the bank counter.
+        if ((number == null) != (bank == null)) {
+            return data("INCOMPLETE");
         }
 
         User user = optionalUser.get();
-        user.setAccountNumber(cleaned);
+        user.setAccountNumber(number);
+        user.setBankName(bank);
         userRepository.save(user);
         return data("SAVED");
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     @Transactional

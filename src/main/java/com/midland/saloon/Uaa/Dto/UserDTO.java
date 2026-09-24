@@ -34,6 +34,7 @@ public class UserDTO {
     @NotNull(message = "Provide Root Status")
     private Boolean isRoot;
 
-    /** Optional: most people add this themselves later, from their profile. */
+    /** Optional: most people add these themselves later, from their profile. */
     private String accountNumber;
+    private String bankName;
 }

@@ -107,9 +107,12 @@ public class PayrollService {
                 .count());
         // Counted only among people actually owed something: somebody
         // already settled has no missing detail worth chasing this month.
+        // Either part missing makes the transfer un-instructable, so both
+        // count the same way.
         payroll.setMissingAccount((int) lines.stream()
                 .filter(line -> line.getToPay() > 0)
-                .filter(line -> line.getAccountNumber() == null || line.getAccountNumber().isBlank())
+                .filter(line -> line.getAccountNumber() == null || line.getAccountNumber().isBlank()
+                        || line.getBankName() == null || line.getBankName().isBlank())
                 .count());
 
         return new Response<>(payroll);
@@ -134,6 +137,7 @@ public class PayrollService {
             if (user != null) {
                 line.setPhone(user.getPhone());
                 line.setAccountNumber(user.getAccountNumber());
+                line.setBankName(user.getBankName());
             }
         }
     }

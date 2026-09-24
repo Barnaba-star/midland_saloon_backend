@@ -132,5 +132,12 @@ public class User extends BaseEntity {
     @Column(name = "account_number", length = 50)
     private String accountNumber;
 
+    /**
+     * Which bank that account is at. An account number alone cannot be paid
+     * to when people bank in different places, and most do.
+     */
+    @Column(name = "bank_name", length = 100)
+    private String bankName;
+
 
 }

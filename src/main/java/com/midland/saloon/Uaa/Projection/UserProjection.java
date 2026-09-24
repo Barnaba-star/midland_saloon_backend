@@ -52,6 +52,8 @@ public interface UserProjection {
     /** Where the payroll sends this person's share. */
     String getAccountNumber();
 
+    String getBankName();
+
     /** True while the account is still on its one-time code. */
     Boolean getMustChangePassword();
 
