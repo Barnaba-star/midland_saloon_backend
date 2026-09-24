@@ -9,6 +9,7 @@ import com.midland.saloon.Uaa.Dto.*;
 import com.midland.saloon.Uaa.Model.User;
 import com.midland.saloon.Uaa.Projection.UserProjection;
 import com.midland.saloon.Notification.Sms.Service.SmsService;
+import com.midland.saloon.Uaa.Support.PasswordGenerator;
 import com.midland.saloon.Uaa.Repository.UserRepository;
 import com.midland.saloon.Utils.Exceptions.BusinessException;
 import com.midland.saloon.Utils.PageableParam;
@@ -37,6 +38,9 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final BranchRepository branchRepository;
     private final SmsService smsService;
+
+    // Matches the minimum the change-password dialog enforces.
+    private static final int MIN_PASSWORD_LENGTH = 6;
 
 
     public Response<User> saveUser(UserDTO userDTO){
@@ -81,8 +85,11 @@ public class UserService {
         String plainPassword = null;
         if (isNew) {
             user.setUsername(userDTO.getFirstName() + "@" + LocalDate.now().getYear());
-            plainPassword = userDTO.getLastName();
+            // Was the surname, which is not a secret. Now random, and only
+            // good for one thing until they replace it - see mustChangePassword.
+            plainPassword = PasswordGenerator.generate();
             user.setPassword(passwordEncoder.encode(plainPassword));
+            user.setMustChangePassword(true);
         }
 
         try{
@@ -225,7 +232,15 @@ public class UserService {
         if (!dataDTO.getNewPassword().equals(dataDTO.getConfirmPassword())) {
             return new Response<>("Passwords do not match");
         }
+        // The dialog checks this too, but the dialog is not the boundary -
+        // this endpoint can be called directly.
+        if (dataDTO.getNewPassword() == null || dataDTO.getNewPassword().length() < MIN_PASSWORD_LENGTH) {
+            return new Response<>("Password is too short");
+        }
         user.setPassword(passwordEncoder.encode(dataDTO.getNewPassword()));
+        // Whatever they chose - even the password we texted them - they chose
+        // it, so the account stops being one that can only change its password.
+        user.setMustChangePassword(false);
         return new Response<>(userRepository.save(user));
     }
 

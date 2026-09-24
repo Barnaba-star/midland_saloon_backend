@@ -53,6 +53,10 @@ public class JwtTokenUtil {
                 .claim("fullName", fullName)
                 .claim("userUID", userUID)
                 .claim("email", email)
+                // Carried in the token so both sides read the same answer: the
+                // filter decides what this token may reach, the login screen
+                // decides where to send them. One source, no drift.
+                .claim("mustChangePassword", Boolean.TRUE.equals(user.getMustChangePassword()))
                 .setExpiration(new Date(System.currentTimeMillis() + expirationTime))
                 .setIssuedAt(new Date())
                 .signWith(SignatureAlgorithm.HS512, PRIVATE_KEY)
@@ -87,6 +91,17 @@ public class JwtTokenUtil {
         Boolean isRoot = claims.get("isRoot", Boolean.class);
         return Boolean.TRUE.equals(isRoot);
 
+    }
+
+    public Boolean mustChangePassword(String token){
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(PRIVATE_KEY)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        // Absent on tokens issued before this claim existed, which is the
+        // same as "no, they don't".
+        return Boolean.TRUE.equals(claims.get("mustChangePassword", Boolean.class));
     }
 
     public List<SimpleGrantedAuthority> extractRoles(String token){

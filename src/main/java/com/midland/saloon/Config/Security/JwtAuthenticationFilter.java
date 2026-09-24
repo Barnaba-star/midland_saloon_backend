@@ -63,7 +63,32 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authToken);
         }
+
+        // An account still on its texted password holds a token that opens
+        // one door only. Hiding the rest in the UI is not enough - the token
+        // is a bearer credential, and whoever read that SMS has it too.
+        if (jwtTokenUtil.mustChangePassword(token) && !isPasswordChangePath(request)) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("application/json");
+            response.setCharacterEncoding("UTF-8");
+            // A code, no message: the wording belongs to the screen, which
+            // has it translated - the same arrangement as SUBSCRIPTION_EXPIRED.
+            response.getWriter().write("{\"status\":403,\"code\":\"PASSWORD_CHANGE_REQUIRED\"}");
+            return;
+        }
+
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * The doors left open: /authentication, which is permitAll anyway, so a
+     * half-trusted token buys nothing extra there. Blocking the prefix instead
+     * would trap them - a stale cookie carrying this flag would make even
+     * logging in again impossible.
+     */
+    private static boolean isPasswordChangePath(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path != null && path.contains("/authentication/");
     }
 
     public static List<SimpleGrantedAuthority> mergeAuthorities(List<SimpleGrantedAuthority> permissions, List<SimpleGrantedAuthority> roles){

@@ -49,7 +49,7 @@ public class SmsService {
      */
     public void sendCredentials(String uid, String phoneNumber, String username, String password) {
         String body = String.format(
-                "Karibu %s. Jina lako la kuingia: %s. Neno la siri: %s. Tafadhali libadilishe baada ya kuingia.",
+                "Karibu %s. Jina lako la kuingia: %s. Neno la siri: %s. Utaombwa kulibadilisha mara ya kwanza utakapoingia.",
                 appName, username, password
         );
         send(TEMPLATE_USER_CREDENTIALS, uid, phoneNumber, body, false);

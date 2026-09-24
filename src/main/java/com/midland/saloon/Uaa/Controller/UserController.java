@@ -127,9 +127,22 @@ public class UserController {
         }
     }
 
+    /**
+     * Returns a fresh token alongside the result. The one the caller is
+     * holding still says the password must be changed, so without this they
+     * would change it and then be locked out of everything by their own
+     * now-stale token until they logged in again.
+     */
     @PostMapping("/changePassword")
-    public Response<User> changePassword(@RequestBody DataDTO dataDTO){
-        return userService.changePassword(dataDTO);
+    public Response<Map<String, Object>> changePassword(@RequestBody DataDTO dataDTO){
+        Response<User> result = userService.changePassword(dataDTO);
+        if (result.getData() == null) {
+            return new Response<>(result.getMessage());
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("uid", result.getData().getUid());
+        body.put("token", jwtTokenUtil.generateToken(result.getData()));
+        return new Response<>(body);
     }
 
     /**

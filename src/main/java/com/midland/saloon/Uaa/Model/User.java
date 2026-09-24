@@ -44,6 +44,20 @@ public class User extends BaseEntity {
     @Column(name = "is_blocked")
     private Boolean isBlocked = false;
 
+    /**
+     * Set when the account is created, cleared the moment the person chooses
+     * their own password. Until then their password is the random one that
+     * travelled to them over SMS - readable by anyone who saw that message,
+     * and stored in whatever sent it. So while this is true the token they
+     * hold opens exactly one door: changing the password.
+     *
+     * Defaults to false, which is what every account that already existed
+     * before this was added reads as - they are not dragged through a change
+     * they never needed.
+     */
+    @Column(name = "must_change_password")
+    private Boolean mustChangePassword = false;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",
