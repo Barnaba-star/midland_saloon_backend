@@ -2908,6 +2908,12 @@ public class SaloonService {
         LocalDate today = LocalDate.now();
 
         DashboardSummaryDTO summary = new DashboardSummaryDTO();
+        // Already on the principal - the auth filter fetches the branch with
+        // the user - so naming it here costs no extra query.
+        User currentUser = LoggerUser.getUser();
+        if (currentUser != null && currentUser.getBranch() != null) {
+            summary.setBranchName(currentUser.getBranch().getBranchName());
+        }
         summary.setTodayRevenue(saloonReportsRepository.totalRevenueOn(branchUID, today));
         summary.setYesterdayRevenue(saloonReportsRepository.totalRevenueOn(branchUID, today.minusDays(1)));
         summary.setServicesSoldToday(saloonReportsRepository.countServicesSoldOn(branchUID, today));

@@ -15,6 +15,9 @@ import lombok.Setter;
 @AllArgsConstructor
 public class DashboardSummaryDTO {
 
+    /** Shown on the dashboard so the figures are clearly tied to a branch. */
+    private String branchName;
+
     private long todayRevenue;
 
     /** Yesterday's total, so today can be shown as a change rather than a bare figure. */
