@@ -1,6 +1,7 @@
 package com.midland.saloon.Payment.Controller;
 
 import com.midland.saloon.Payment.Model.SubscriptionPayment;
+import com.midland.saloon.Payment.Projection.PaymentTotalsProjection;
 import com.midland.saloon.Payment.Repository.SubscriptionPaymentRepository;
 import com.midland.saloon.Payment.Service.PaymentReconcileService;
 import com.midland.saloon.Setting.Model.Branch;
@@ -11,6 +12,10 @@ import com.midland.saloon.Utils.Responses.ResponsePage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/payment")
@@ -25,6 +30,23 @@ public class PaymentController {
     @PostMapping("/findPaymentPage")
     public ResponsePage<SubscriptionPayment> findPaymentPage(@RequestBody PageableParam pageableParam) {
         return new ResponsePage<>(subscriptionPaymentRepository.findAll(pageableParam.pageable(false)));
+    }
+
+    /** Totals across everything, so the page does not report its own page. */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_PAYMENTS')")
+    @GetMapping("/findPaymentTotals")
+    public Response<Map<String, Long>> findPaymentTotals() {
+        PaymentTotalsProjection totals = subscriptionPaymentRepository.totals();
+        Map<String, Long> result = new LinkedHashMap<>();
+        result.put("payments", orZero(totals == null ? null : totals.getPayments()));
+        result.put("totalAmount", orZero(totals == null ? null : totals.getTotalAmount()));
+        result.put("totalCommission", orZero(totals == null ? null : totals.getTotalCommission()));
+        result.put("thisMonth", subscriptionPaymentRepository.amountSince(LocalDate.now().withDayOfMonth(1)));
+        return new Response<>(result);
+    }
+
+    private static long orZero(Long value) {
+        return value == null ? 0L : value;
     }
 
     /** Payments started and never resolved - the ones worth chasing. */

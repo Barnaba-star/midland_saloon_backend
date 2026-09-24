@@ -1,6 +1,7 @@
 package com.midland.saloon.Payment.Repository;
 
 import com.midland.saloon.Payment.Model.SubscriptionPayment;
+import com.midland.saloon.Payment.Projection.PaymentTotalsProjection;
 import com.midland.saloon.Payment.Projection.StaffEarningProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -58,4 +59,22 @@ public interface SubscriptionPaymentRepository extends JpaRepository<Subscriptio
             @Param("start") LocalDate start,
             @Param("end") LocalDate end
     );
+
+    // Totals across everything, not just the page on screen. "How much has
+    // come in" is the question this page exists to answer, and a page total
+    // answers a different one.
+    @Query("""
+            SELECT COUNT(p) AS payments,
+                   COALESCE(SUM(p.amount), 0) AS totalAmount,
+                   COALESCE(SUM(p.commissionAmount), 0) AS totalCommission
+            FROM SubscriptionPayment p
+            """)
+    PaymentTotalsProjection totals();
+
+    @Query("""
+            SELECT COALESCE(SUM(p.amount), 0)
+            FROM SubscriptionPayment p
+            WHERE p.paidAt >= :start
+            """)
+    long amountSince(@Param("start") java.time.LocalDate start);
 }
