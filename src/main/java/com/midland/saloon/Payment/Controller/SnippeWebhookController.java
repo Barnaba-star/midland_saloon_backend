@@ -60,7 +60,7 @@ public class SnippeWebhookController {
 
             switch (type) {
                 case "payment.completed" -> applyCompletedPayment(branchUID, reference, data);
-                case "payment.failed", "payment.expired", "payment.voided" -> markSubscriptionFailed(branchUID);
+                case "payment.failed", "payment.expired", "payment.voided" -> markSubscriptionFailed(branchUID, type, data);
                 default -> log.info("Ignoring unhandled Snippe webhook event type: " + type);
             }
 
@@ -101,6 +101,10 @@ public class SnippeWebhookController {
             branch.setOpenSubscription(LocalDate.now());
             branch.setCloseSubscription(base.plusMonths(months));
             branch.setSubscriptionStatus("ACTIVE");
+            // A paid branch carries no failure any more; leaving the old one
+            // would have the login screen explaining a decline that has since
+            // been settled.
+            branch.setLastPaymentFailure(null);
             branch.setLastSubscriptionPaymentRef(reference);
 
             branchRepository.save(branch);
@@ -109,11 +113,48 @@ public class SnippeWebhookController {
         });
     }
 
-    private void markSubscriptionFailed(String branchUID) {
+    private void markSubscriptionFailed(String branchUID, String type, JsonNode data) {
+        String reason = parseFailureReason(data);
+
+        // Logged in full because the docs do not pin down which field carries
+        // the reason - this is how the real shape gets known rather than
+        // guessed at a second time.
+        log.info("Snippe " + type + " for branch " + branchUID + ": " + data);
+
         branchRepository.findById(branchUID).ifPresent(branch -> {
             branch.setSubscriptionStatus("FAILED");
+            branch.setLastPaymentFailure(truncate(reason, 500));
             branchRepository.save(branch);
         });
+    }
+
+    /**
+     * Snippe's own wording for the decline. Several field names are tried
+     * because the reference does not say which one a failure carries; the
+     * event type is the fallback so the row is never left blank.
+     */
+    private String parseFailureReason(JsonNode data) {
+        for (String field : new String[]{"failure_reason", "failureReason", "reason", "message", "error", "description"}) {
+            String value = data.path(field).asText(null);
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        JsonNode nested = data.path("failure");
+        if (nested.isObject()) {
+            String value = nested.path("message").asText(null);
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private static String truncate(String value, int max) {
+        if (value == null) {
+            return null;
+        }
+        return value.length() <= max ? value : value.substring(0, max);
     }
 
     // Snippe echoes back the amount we charged. Null rather than 0 when it's

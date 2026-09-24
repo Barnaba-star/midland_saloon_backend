@@ -103,6 +103,7 @@ public class UserController {
             // this the screen repeats "expired" after a declined payment and
             // says nothing about why paying did not help.
             expired.put("subscriptionStatus", branch.getSubscriptionStatus());
+            expired.put("paymentFailure", branch.getLastPaymentFailure());
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(expired);
         }
 

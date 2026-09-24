@@ -102,4 +102,12 @@ public class Branch extends BaseEntity {
     // can arrive more than once).
     @Column(name = "last_subscription_payment_ref")
     private String lastSubscriptionPaymentRef;
+
+    /**
+     * Why the last payment did not go through, as Snippe reported it. Kept so
+     * the login screen can say more than "expired" - "you have no balance" is
+     * something the customer can act on.
+     */
+    @Column(name = "last_payment_failure", length = 500)
+    private String lastPaymentFailure;
 }
