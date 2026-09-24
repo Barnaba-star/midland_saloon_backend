@@ -4,6 +4,7 @@ import com.midland.saloon.Payment.Model.SubscriptionPayment;
 import com.midland.saloon.Payment.Projection.PaymentTotalsProjection;
 import com.midland.saloon.Payment.Repository.SubscriptionPaymentRepository;
 import com.midland.saloon.Payment.Dto.RevenueShareDTO;
+import com.midland.saloon.Payment.Dto.ShareRecipientDTO;
 import com.midland.saloon.Payment.Service.PaymentReconcileService;
 import com.midland.saloon.Payment.Service.RevenueShareService;
 import com.midland.saloon.Setting.Model.Branch;
@@ -60,6 +61,17 @@ public class PaymentController {
             @RequestParam(required = false) Integer month
     ) {
         return revenueShareService.findRevenueShare(year, month);
+    }
+
+    /** Who is owed one of those shares, and how much each. */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_PAYMENTS')")
+    @GetMapping("/findShareRecipients/{role}")
+    public ResponseList<ShareRecipientDTO> findShareRecipients(
+            @PathVariable String role,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month
+    ) {
+        return revenueShareService.findShareRecipients(role, year, month);
     }
 
     /** Payments started and never resolved - the ones worth chasing. */
