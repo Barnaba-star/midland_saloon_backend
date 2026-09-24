@@ -3,9 +3,11 @@ package com.midland.saloon.Payment.Controller;
 import com.midland.saloon.Payment.Model.SubscriptionPayment;
 import com.midland.saloon.Payment.Projection.PaymentTotalsProjection;
 import com.midland.saloon.Payment.Repository.SubscriptionPaymentRepository;
+import com.midland.saloon.Payment.Dto.PayrollDTO;
 import com.midland.saloon.Payment.Dto.RevenueShareDTO;
 import com.midland.saloon.Payment.Dto.ShareRecipientDTO;
 import com.midland.saloon.Payment.Service.PaymentReconcileService;
+import com.midland.saloon.Payment.Service.PayrollService;
 import com.midland.saloon.Payment.Service.RevenueShareService;
 import com.midland.saloon.Setting.Model.Branch;
 import com.midland.saloon.Utils.PageableParam;
@@ -28,6 +30,7 @@ public class PaymentController {
     private final SubscriptionPaymentRepository subscriptionPaymentRepository;
     private final PaymentReconcileService paymentReconcileService;
     private final RevenueShareService revenueShareService;
+    private final PayrollService payrollService;
 
     /** Money in: every subscription payment that actually completed. */
     @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_PAYMENTS')")
@@ -61,6 +64,19 @@ public class PaymentController {
             @RequestParam(required = false) Integer month
     ) {
         return revenueShareService.findRevenueShare(year, month);
+    }
+
+    /**
+     * The same share-out laid out as a payment schedule, to be printed and
+     * handed to the bank. Only what is still owed appears on it.
+     */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_PAYMENTS')")
+    @GetMapping("/findPayroll")
+    public Response<PayrollDTO> findPayroll(
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month
+    ) {
+        return payrollService.findPayroll(year, month);
     }
 
     /** Who is owed one of those shares, and how much each. */
