@@ -3,6 +3,7 @@ package com.midland.saloon.Setting.Controller;
 import com.midland.saloon.Setting.Dto.UserSettingDTo;
 import com.midland.saloon.Uaa.Dto.AssignUserRoleDTO;
 import com.midland.saloon.Uaa.Dto.UserAndAttachmentDTO;
+import com.midland.saloon.Uaa.Dto.SavedUserDTO;
 import com.midland.saloon.Uaa.Dto.UserDTO;
 import com.midland.saloon.Uaa.Model.User;
 import com.midland.saloon.Uaa.Projection.UserProjection;
@@ -70,7 +71,7 @@ public class UserSettingController {
 
     @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_USER')")
     @PostMapping("/saveUser")
-    public Response<User> saveUser(@ RequestBody  UserDTO userDTO){
+    public Response<SavedUserDTO> saveUser(@ RequestBody  UserDTO userDTO){
         return userService.saveUser(userDTO);
     }
 

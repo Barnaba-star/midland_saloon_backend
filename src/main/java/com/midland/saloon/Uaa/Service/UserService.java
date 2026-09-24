@@ -44,7 +44,7 @@ public class UserService {
     private static final int MIN_PASSWORD_LENGTH = 6;
 
 
-    public Response<User> saveUser(UserDTO userDTO){
+    public Response<SavedUserDTO> saveUser(UserDTO userDTO){
         log.info(LoggerUser.getEmail() + "Is Saving User");
         if(userDTO == null)
             return new Response<>("Provide User Data");
@@ -89,6 +89,23 @@ public class UserService {
             // Was the surname, which is not a secret. Now a one-time code that
             // is only good for setting a real password - see mustChangePassword.
             activationCode = issueActivationCode(user);
+
+            // The role is chosen here rather than in a second, separate step.
+            // Without one the account cannot open anything, so someone
+            // registered at the counter could not start work until an admin
+            // went back and assigned it.
+            if (userDTO.getRole() != null && !userDTO.getRole().isBlank()) {
+                Optional<Role> optionalRole = roleRepository.findById(userDTO.getRole());
+                if (optionalRole.isEmpty())
+                    return new Response<>("Role Not Found");
+                Role role = optionalRole.get();
+                // STAFF are only shown the branch-operational roles, so they
+                // must not be able to grant one they cannot see. Same rule as
+                // assignOrUnAssignUserRole.
+                if (!seesAllRoles() && !STAFF_VISIBLE_ROLE_CODES.contains(role.getCode()))
+                    return new Response<>("Role Not Allowed");
+                user.setRoles(new ArrayList<>(List.of(role)));
+            }
         }
 
         try{
@@ -107,7 +124,11 @@ public class UserService {
                 );
             }
 
-            return new Response<>(saved);
+            return new Response<>(new SavedUserDTO(
+                    saved,
+                    activationCode,
+                    isNew ? ActivationCode.VALID_HOURS : null
+            ));
         }catch (Exception e){
             e.printStackTrace();
             return new Response<>("Error in saving user");
