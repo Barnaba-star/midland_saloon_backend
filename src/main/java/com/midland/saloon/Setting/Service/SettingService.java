@@ -183,7 +183,6 @@ public class SettingService {
                 phoneNumber,
                 user.getFirstName(),
                 user.getLastName(),
-                user.getEmail(),
                 branch.getUid(),
                 months
         );

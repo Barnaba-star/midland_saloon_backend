@@ -37,6 +37,14 @@ public class SnippeClient {
     @Value("${snippe.webhook-url}")
     private String webhookUrl;
 
+    /**
+     * Snippe rejects a payment without customer.email. A subscription is paid
+     * by a branch rather than by a person, and not every staff member has an
+     * address on file, so the billing address is the platform's own.
+     */
+    @Value("${snippe.billing-email}")
+    private String billingEmail;
+
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
@@ -54,7 +62,6 @@ public class SnippeClient {
             String phoneNumber,
             String firstName,
             String lastName,
-            String email,
             String branchUID,
             int months
     ) {
@@ -65,10 +72,13 @@ public class SnippeClient {
             details.put("amount", amountTzs);
             details.put("currency", "TZS");
 
+            // firstname, lastname and email are all required - a blank any of
+            // them comes back as a validation error rather than a payment, so
+            // none of them is passed through unchecked.
             Map<String, Object> customer = new LinkedHashMap<>();
-            customer.put("firstname", firstName);
-            customer.put("lastname", lastName);
-            customer.put("email", email);
+            customer.put("firstname", orFallback(firstName, "Midland"));
+            customer.put("lastname", orFallback(lastName, "Subscription"));
+            customer.put("email", billingEmail);
 
             Map<String, Object> metadata = new LinkedHashMap<>();
             metadata.put("branchUID", branchUID);
@@ -178,5 +188,9 @@ public class SnippeClient {
         String shortUid = branchUID.length() > 8 ? branchUID.substring(0, 8) : branchUID;
         long epochSeconds = System.currentTimeMillis() / 1000;
         return "sub-" + shortUid + "-" + epochSeconds;
+    }
+
+    private static String orFallback(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
     }
 }
