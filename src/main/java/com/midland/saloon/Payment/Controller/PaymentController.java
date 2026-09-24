@@ -82,9 +82,10 @@ public class PaymentController {
             @PathVariable String uid,
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) Integer month,
-            @RequestParam(required = false) String note
+            @RequestParam(required = false) String note,
+            @RequestParam(required = false) Integer amount
     ) {
-        return revenueShareService.payShare(role, uid, year, month, note);
+        return revenueShareService.payShare(role, uid, year, month, note, amount);
     }
 
     /** Payments started and never resolved - the ones worth chasing. */

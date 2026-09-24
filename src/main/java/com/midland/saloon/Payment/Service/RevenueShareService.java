@@ -175,14 +175,14 @@ public class RevenueShareService {
      * disagree about what is still owed.
      */
     @Transactional
-    public Response<String> payShare(String role, String uid, Integer year, Integer month, String note) {
+    public Response<String> payShare(String role, String uid, Integer year, Integer month, String note, Integer amount) {
         String wanted = role == null ? "" : role.trim().toUpperCase();
         if (uid == null || uid.isBlank()) {
             return new Response<>("Provide the person to pay");
         }
 
         if (STAFF_ROLE_CODE.equals(wanted)) {
-            Response<CommissionPayout> paid = commissionService.payStaffCommission(uid, year, month, note);
+            Response<CommissionPayout> paid = commissionService.payStaffCommission(uid, year, month, note, amount);
             return paid.getData() != null
                     ? new Response<>("Payout recorded")
                     : new Response<>(paid.getMessage());
@@ -220,13 +220,21 @@ public class RevenueShareService {
                     : "This share has already been paid");
         }
 
+        long paying = amount == null ? recipient.getOutstanding() : amount;
+        if (paying <= 0) {
+            return new Response<>("Provide an amount greater than zero");
+        }
+        if (paying > recipient.getOutstanding()) {
+            return new Response<>("That is more than is owed for this period");
+        }
+
         CommissionPayout payout = new CommissionPayout();
         payout.setRoleCode(wanted);
         payout.setStaffUid(uid);
         payout.setStaffName(recipient.getName());
         payout.setPeriodYear(period.getYear());
         payout.setPeriodMonth(period.getMonthValue());
-        payout.setAmount((int) recipient.getOutstanding());
+        payout.setAmount((int) paying);
         payout.setPaidAt(LocalDate.now());
         payout.setNote(note);
         payout.setPaidByUid(payer.getUid());

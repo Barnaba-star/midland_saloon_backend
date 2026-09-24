@@ -256,6 +256,15 @@ public class CommissionService {
      * month, outstanding is zero and this refuses.
      */
     public Response<CommissionPayout> payStaffCommission(String staffUid, Integer year, Integer month, String note) {
+        return payStaffCommission(staffUid, year, month, note, null);
+    }
+
+    /**
+     * @param amount how much is being handed over, or null for everything
+     *               still owed. A part payment leaves the rest outstanding
+     *               rather than closing the month off.
+     */
+    public Response<CommissionPayout> payStaffCommission(String staffUid, Integer year, Integer month, String note, Integer amount) {
 
         if (staffUid == null)
             return new Response<>("Provide staff ref UID");
@@ -285,12 +294,20 @@ public class CommissionService {
                     : "This Commission Has Already Been Paid");
         }
 
+        long paying = amount == null ? row.getOutstanding() : amount;
+        if (paying <= 0) {
+            return new Response<>("Provide An Amount Greater Than Zero");
+        }
+        if (paying > row.getOutstanding()) {
+            return new Response<>("That Is More Than Is Owed For This Period");
+        }
+
         CommissionPayout payout = new CommissionPayout();
         payout.setStaffUid(staffUid);
         payout.setStaffName(row.getStaffName());
         payout.setPeriodYear(period.getYear());
         payout.setPeriodMonth(period.getMonthValue());
-        payout.setAmount((int) row.getOutstanding());
+        payout.setAmount((int) paying);
         payout.setPaidAt(LocalDate.now());
         payout.setNote(note);
 
