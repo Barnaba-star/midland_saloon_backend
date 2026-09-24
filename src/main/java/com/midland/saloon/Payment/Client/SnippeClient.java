@@ -193,4 +193,104 @@ public class SnippeClient {
     private static String orFallback(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value.trim();
     }
+
+    /**
+     * Asks Snippe what became of a payment we started. This is the fallback
+     * the docs point at when a webhook never lands: without it, a customer
+     * who paid while the tunnel was down stays locked out and nobody can
+     * find out why.
+     */
+    public SnippePaymentResult getPayment(String reference) {
+        if (reference == null || reference.isBlank()) {
+            return new SnippePaymentResult(false, null, null, "no_reference", "No payment reference held for this branch");
+        }
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/payments/" + reference))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            JsonNode json = objectMapper.readTree(response.body());
+
+            if ("success".equals(json.path("status").asText())) {
+                JsonNode data = json.path("data");
+                return new SnippePaymentResult(
+                        true,
+                        data.path("reference").asText(reference),
+                        data.path("status").asText(null),
+                        null,
+                        failureReasonOf(data)
+                );
+            }
+
+            return new SnippePaymentResult(false, reference, null,
+                    json.path("error_code").asText(null),
+                    json.path("message").asText("Could not read payment"));
+
+        } catch (Exception e) {
+            return new SnippePaymentResult(false, reference, null, "client_error", e.getMessage());
+        }
+    }
+
+    /**
+     * The payment object exactly as Snippe holds it, so reconciliation can
+     * hand it to the same code the webhook uses. Null when unreachable or
+     * unknown.
+     */
+    public JsonNode getPaymentData(String reference) {
+        if (reference == null || reference.isBlank()) {
+            return null;
+        }
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/payments/" + reference))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .GET()
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            JsonNode json = objectMapper.readTree(response.body());
+            return "success".equals(json.path("status").asText()) ? json.path("data") : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** Available balance, in TZS. Null when Snippe could not be reached. */
+    public Long getAvailableBalance() {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/v1/payments/balance"))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            JsonNode json = objectMapper.readTree(response.body());
+            if (!"success".equals(json.path("status").asText())) {
+                return null;
+            }
+            // Balance comes back as an object, like every other amount in
+            // Snippe's responses.
+            JsonNode available = json.path("data").path("available");
+            JsonNode value = available.isObject() ? available.path("value") : available;
+            return value.isNumber() ? value.asLong() : null;
+
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** Same field-name hunt the webhook does - the reference does not pin it down. */
+    private static String failureReasonOf(JsonNode data) {
+        for (String field : new String[]{"failure_reason", "failureReason", "reason", "message", "error", "description"}) {
+            String value = data.path(field).asText(null);
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
 }

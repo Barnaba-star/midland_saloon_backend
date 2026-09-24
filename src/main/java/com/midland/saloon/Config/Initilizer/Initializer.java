@@ -183,7 +183,8 @@ public class Initializer implements ApplicationRunner {
                         "VIEW_COMMISSION_REPORT",
                         // Settings > Errors, so a DIRECTOR can see what broke
                         // without going through ROOT.
-                        "VIEW_ERROR_LOG", "DELETE_ERROR_LOG", "VIEW_AUDIT_LOG"
+                        "VIEW_ERROR_LOG", "DELETE_ERROR_LOG", "VIEW_AUDIT_LOG",
+                        "VIEW_PAYMENTS", "RECONCILE_PAYMENTS"
                 )
         );
         // STAFF registers branches (only ever seeing its own) and sets up

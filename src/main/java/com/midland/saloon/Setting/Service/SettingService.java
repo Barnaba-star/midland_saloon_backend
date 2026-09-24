@@ -19,6 +19,7 @@ import lombok.extern.java.Log;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -192,6 +193,11 @@ public class SettingService {
 
         branch.setSubscriptionStatus("PENDING");
         branch.setSubscriptionPhoneNumber(phoneNumber);
+        // Stored now, while we have it. If the webhook never lands this is
+        // the only way back to what happened to the customer's money.
+        branch.setPendingPaymentRef(result.getReference());
+        branch.setPendingPaymentAt(LocalDateTime.now());
+        branch.setLastPaymentFailure(null);
 
         try {
             branch = branchRepository.save(branch);

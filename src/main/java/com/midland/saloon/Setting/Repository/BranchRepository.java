@@ -100,4 +100,15 @@ public interface BranchRepository extends JpaRepository<Branch, String> {
 """)
     List<Branch> findAllByCreator(@Param("createdBy") String createdBy);
 
+    /**
+     * Payments that were started and never resolved - still pending, or
+     * failed - and that still carry a reference to ask Snippe about.
+     */
+    @Query("""
+            SELECT b FROM Branch b
+            WHERE b.pendingPaymentRef IS NOT NULL
+              AND (b.subscriptionStatus = 'PENDING' OR b.subscriptionStatus = 'FAILED')
+            ORDER BY b.pendingPaymentAt DESC
+            """)
+    List<Branch> findUnresolvedPayments();
 }

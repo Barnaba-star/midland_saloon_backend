@@ -110,4 +110,16 @@ public class Branch extends BaseEntity {
      */
     @Column(name = "last_payment_failure", length = 500)
     private String lastPaymentFailure;
+
+    /**
+     * Snippe's reference for a payment that has been started but not yet
+     * confirmed. Kept from the moment it is initiated, not from the moment it
+     * completes: a webhook that never arrives leaves a customer who has paid
+     * locked out, and without this there is nothing left to ask Snippe about.
+     */
+    @Column(name = "pending_payment_ref")
+    private String pendingPaymentRef;
+
+    @Column(name = "pending_payment_at")
+    private java.time.LocalDateTime pendingPaymentAt;
 }
