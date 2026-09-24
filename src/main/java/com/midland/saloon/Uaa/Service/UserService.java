@@ -85,7 +85,7 @@ public class UserService {
         // What is stored is the hash, as before.
         String activationCode = null;
         if (isNew) {
-            user.setUsername(userDTO.getFirstName() + "@" + LocalDate.now().getYear());
+            user.setUsername(uniqueUsername(userDTO.getFirstName()));
             // Was the surname, which is not a secret. Now a one-time code that
             // is only good for setting a real password - see mustChangePassword.
             activationCode = issueActivationCode(user);
@@ -134,6 +134,37 @@ public class UserService {
             return new Response<>("Error in saving user");
         }
     }
+    /**
+     * The sign-in name, which has to be one person's and nobody else's.
+     *
+     * It used to be first name and year with nothing checking it, so two
+     * people called Hela registered in the same year both became Hela@2026 -
+     * and login, which looks a person up by this name, then found two rows
+     * and threw. Neither of them could sign in.
+     *
+     * A second Hela is now Hela2@2026. The counter reads as an ordinal to
+     * anyone who sees it, which a random suffix would not.
+     */
+    private String uniqueUsername(String firstName) {
+        int year = LocalDate.now().getYear();
+        String base = firstName + "@" + year;
+        if (userRepository.countUsername(base) == 0) {
+            return base;
+        }
+        for (int n = 2; n <= MAX_USERNAME_ATTEMPTS; n++) {
+            String candidate = firstName + n + "@" + year;
+            if (userRepository.countUsername(candidate) == 0) {
+                return candidate;
+            }
+        }
+        // A thousand people with one first name in one year is not a real
+        // salon; falling back to the uid keeps the account creatable rather
+        // than failing on a number nobody will reach.
+        return firstName + "-" + java.util.UUID.randomUUID().toString().substring(0, 6) + "@" + year;
+    }
+
+    private static final int MAX_USERNAME_ATTEMPTS = 1000;
+
     /**
      * Puts a fresh code on the account and returns it in plain, once, for the
      * caller to text. Only the hash is kept, exactly as for a password.

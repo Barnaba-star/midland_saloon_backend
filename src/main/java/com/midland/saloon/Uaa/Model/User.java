@@ -28,6 +28,12 @@ import java.util.List;
         // Looked up once per authenticated request to build the principal,
         // so this is the single hottest lookup in the system.
         @Index(name = "idx_users_username", columnList = "username")
+}, uniqueConstraints = {
+        // Login finds a person by this name, so two rows sharing one is not a
+        // duplicate record - it is a lookup that cannot answer, and neither
+        // person can sign in. UserService picks a free name, but only the
+        // database can promise it across two registrations at once.
+        @jakarta.persistence.UniqueConstraint(name = "uk_users_username", columnNames = "username")
 })
 public class User extends BaseEntity {
 

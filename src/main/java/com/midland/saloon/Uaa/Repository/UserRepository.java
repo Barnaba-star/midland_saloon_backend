@@ -20,6 +20,17 @@ public interface UserRepository extends JpaRepository<User, String> {
     @Query("SELECT COUNT(u) > 0 FROM User u WHERE u.username = :username")
     Boolean existByUsername(@Param("username") String username);
 
+    /**
+     * Whether any row at all holds this username.
+     *
+     * Native on purpose: User carries @Where(is_active = true), so the JPQL
+     * version above cannot see a deactivated account - it would hand out a
+     * username that is still taken in the table, and the unique constraint
+     * would then reject the insert.
+     */
+    @Query(value = "SELECT COUNT(*) FROM users WHERE username = :username", nativeQuery = true)
+    long countUsername(@Param("username") String username);
+
     @Query("SELECT u FROM User u WHERE u.username=:username")
     User findByUsername(@Param("username") String username);
 
