@@ -4,6 +4,7 @@ import com.midland.saloon.Setting.Model.Branch;
 import com.midland.saloon.Uaa.Dto.DataDTO;
 import com.midland.saloon.Uaa.Dto.LoginDTO;
 import com.midland.saloon.Uaa.Model.User;
+import com.midland.saloon.Uaa.Support.ActivationCode;
 import jakarta.validation.Valid;
 import com.midland.saloon.Setting.Dto.ExpiredSubscriptionPaymentDTO;
 import com.midland.saloon.Setting.Service.SettingService;
@@ -58,7 +59,21 @@ public class UserController {
                     .body("User Not Found");
         }
 
+        boolean awaitingActivation = Boolean.TRUE.equals(user.getMustChangePassword());
+
         if (!passwordEncoder.matches(loginDTO.getPassword(), user.getPassword())) {
+            // A six-digit code is a million guesses, which is nothing to a
+            // machine. Spend them and the code dies - an admin re-sends a new
+            // one. A real password has no such counter; wearing one out by
+            // guessing would be a way to lock people out of their own accounts.
+            if (awaitingActivation) {
+                int attempts = user.getActivationAttempts() == null ? 0 : user.getActivationAttempts();
+                user.setActivationAttempts(attempts + 1);
+                if (attempts + 1 >= ActivationCode.MAX_ATTEMPTS) {
+                    user.setActivationExpiresAt(LocalDateTime.now());
+                }
+                userRepository.save(user);
+            }
             return ResponseEntity
                     .status(HttpStatus.UNAUTHORIZED)
                     .body("Invalid Username or Password");
@@ -68,6 +83,29 @@ public class UserController {
             return ResponseEntity
                     .status(HttpStatus.FORBIDDEN)
                     .body("Account Blocked");
+        }
+
+        // The right code, but too late - or already spent on wrong guesses.
+        // Says so plainly, because "wrong password" would send them hunting
+        // for a typo in something that was never going to work again.
+        if (awaitingActivation
+                && user.getActivationExpiresAt() != null
+                && user.getActivationExpiresAt().isBefore(LocalDateTime.now())) {
+            Map<String, Object> expiredCode = new LinkedHashMap<>();
+            expiredCode.put("status", 403);
+            expiredCode.put("code", "ACTIVATION_CODE_EXPIRED");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(expiredCode);
+        }
+
+        // An account with no roles used to be handed ROOT by the token
+        // builder. It no longer is, which leaves it with nothing at all -
+        // so say that, rather than letting them in to an empty application.
+        boolean hasRole = user.getRoles() != null && !user.getRoles().isEmpty();
+        if (!hasRole && !Boolean.TRUE.equals(user.getIsRoot())) {
+            Map<String, Object> noRole = new LinkedHashMap<>();
+            noRole.put("status", 403);
+            noRole.put("code", "NO_ROLE_ASSIGNED");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(noRole);
         }
 
         // Branch must be within its free/paid period to log in. ROOT users
@@ -108,6 +146,9 @@ public class UserController {
         }
 
         try {
+            if (awaitingActivation) {
+                user.setActivationAttempts(0);
+            }
             user.setLastSeen(LocalDateTime.now());
             userRepository.save(user);
             String token = jwtTokenUtil.generateToken(user);

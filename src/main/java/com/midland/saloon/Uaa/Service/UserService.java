@@ -9,7 +9,7 @@ import com.midland.saloon.Uaa.Dto.*;
 import com.midland.saloon.Uaa.Model.User;
 import com.midland.saloon.Uaa.Projection.UserProjection;
 import com.midland.saloon.Notification.Sms.Service.SmsService;
-import com.midland.saloon.Uaa.Support.PasswordGenerator;
+import com.midland.saloon.Uaa.Support.ActivationCode;
 import com.midland.saloon.Uaa.Repository.UserRepository;
 import com.midland.saloon.Utils.Exceptions.BusinessException;
 import com.midland.saloon.Utils.PageableParam;
@@ -24,6 +24,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -82,14 +83,12 @@ public class UserService {
 
         // Held in plain only for the length of this call, to text it to them.
         // What is stored is the hash, as before.
-        String plainPassword = null;
+        String activationCode = null;
         if (isNew) {
             user.setUsername(userDTO.getFirstName() + "@" + LocalDate.now().getYear());
-            // Was the surname, which is not a secret. Now random, and only
-            // good for one thing until they replace it - see mustChangePassword.
-            plainPassword = PasswordGenerator.generate();
-            user.setPassword(passwordEncoder.encode(plainPassword));
-            user.setMustChangePassword(true);
+            // Was the surname, which is not a secret. Now a one-time code that
+            // is only good for setting a real password - see mustChangePassword.
+            activationCode = issueActivationCode(user);
         }
 
         try{
@@ -97,13 +96,14 @@ public class UserService {
 
             if (isNew) {
                 // After the save, and never blocking it: an account that
-                // exists but whose text failed is recoverable; one that was
-                // not created because a text failed is not.
-                smsService.sendCredentials(
+                // exists but whose text failed is recoverable - the code can
+                // be re-sent; one that was not created because a text failed
+                // is not.
+                smsService.sendActivationCode(
                         saved.getUid(),
                         saved.getPhone(),
                         saved.getUsername(),
-                        plainPassword
+                        activationCode
                 );
             }
 
@@ -113,6 +113,46 @@ public class UserService {
             return new Response<>("Error in saving user");
         }
     }
+    /**
+     * Puts a fresh code on the account and returns it in plain, once, for the
+     * caller to text. Only the hash is kept, exactly as for a password.
+     */
+    private String issueActivationCode(User user) {
+        String code = ActivationCode.generate();
+        user.setPassword(passwordEncoder.encode(code));
+        user.setMustChangePassword(true);
+        user.setActivationExpiresAt(LocalDateTime.now().plusHours(ActivationCode.VALID_HOURS));
+        user.setActivationAttempts(0);
+        return code;
+    }
+
+    /**
+     * A code that expired, was used up on wrong guesses, or never arrived.
+     *
+     * Deliberately refuses an account that has already set its own password:
+     * that would be a password reset, which is a different thing with
+     * different risks, not something an admin should be able to do from the
+     * user list by accident.
+     */
+    public Response<String> resendActivationCode(String userUID) {
+        log.info(LoggerUser.getEmail() + " is resending an activation code");
+        if (userUID == null)
+            return new Response<>("Provide user ref UID");
+        Optional<User> optionalUser = userRepository.findById(userUID);
+        if (optionalUser.isEmpty())
+            return new Response<>("User Not Found");
+        User user = optionalUser.get();
+        if (!Boolean.TRUE.equals(user.getMustChangePassword()))
+            return new Response<>("ALREADY_ACTIVATED");
+        if (user.getPhone() == null || user.getPhone().isBlank())
+            return new Response<>("NO_PHONE");
+
+        String code = issueActivationCode(user);
+        User saved = userRepository.save(user);
+        smsService.sendActivationCode(saved.getUid(), saved.getPhone(), saved.getUsername(), code);
+        return new Response<>("SENT");
+    }
+
     @Transactional
     public Response<User> deleteUser(String uid) {
         User user = userRepository.findById(uid).orElseThrow(() -> new BusinessException("User not found"));
@@ -241,6 +281,9 @@ public class UserService {
         // Whatever they chose - even the password we texted them - they chose
         // it, so the account stops being one that can only change its password.
         user.setMustChangePassword(false);
+        // The code is spent; nothing about it should outlive it.
+        user.setActivationExpiresAt(null);
+        user.setActivationAttempts(0);
         return new Response<>(userRepository.save(user));
     }
 

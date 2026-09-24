@@ -35,8 +35,14 @@ public class JwtTokenUtil {
         String branchUID = user.getBranch().getUid();
         String fullName = String.format("%s             %s", user.getFirstName(), user.getLastName());
         String email = user.getEmail();
-        List<String> roles = user.getRoles() == null || user.getRoles().isEmpty() ? List.of("ROOT") : user.getRoles().stream().map(Role::getName).toList();
-        List<String> permissions = user.getRoles().stream()
+        // An account with no roles used to be handed "ROOT" here - the highest
+        // authority in the system, given out precisely to the accounts nobody
+        // had granted anything to. Stripping someone's last role promoted them.
+        // No roles now means no roles; the real root account carries a ROOT role
+        // of its own, and is independently recognised through the isRoot claim.
+        List<Role> userRoles = user.getRoles() == null ? List.<Role>of() : user.getRoles();
+        List<String> roles = userRoles.stream().map(Role::getName).toList();
+        List<String> permissions = userRoles.stream()
                 .flatMap(role -> role.getPermission().stream())
                 .map(Permission::getName)
                 .distinct()

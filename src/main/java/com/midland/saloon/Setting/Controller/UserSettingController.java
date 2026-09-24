@@ -58,6 +58,16 @@ public class UserSettingController {
         return userService.enableOrDisableAccount(userUID, enable);
     }
 
+    /**
+     * Issues a new one-time code and texts it. For the account that never got
+     * the first message, let it expire, or burned it on wrong guesses.
+     */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_USER')")
+    @PostMapping("/resendActivationCode/{userUID}")
+    public Response<String> resendActivationCode(@PathVariable String userUID){
+        return userService.resendActivationCode(userUID);
+    }
+
     @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_USER')")
     @PostMapping("/saveUser")
     public Response<User> saveUser(@ RequestBody  UserDTO userDTO){

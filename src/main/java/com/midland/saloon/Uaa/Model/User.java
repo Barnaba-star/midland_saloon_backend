@@ -46,10 +46,10 @@ public class User extends BaseEntity {
 
     /**
      * Set when the account is created, cleared the moment the person chooses
-     * their own password. Until then their password is the random one that
+     * their own password. Until then what is stored is the one-time code that
      * travelled to them over SMS - readable by anyone who saw that message,
-     * and stored in whatever sent it. So while this is true the token they
-     * hold opens exactly one door: changing the password.
+     * and by whatever carried it. So while this is true the token they hold
+     * opens exactly one door: setting a password.
      *
      * Defaults to false, which is what every account that already existed
      * before this was added reads as - they are not dragged through a change
@@ -57,6 +57,20 @@ public class User extends BaseEntity {
      */
     @Column(name = "must_change_password")
     private Boolean mustChangePassword = false;
+
+    /**
+     * When the code above stops working. Null on an account that has already
+     * set its own password - a password does not expire, only the code does.
+     */
+    @Column(name = "activation_expires_at")
+    private LocalDateTime activationExpiresAt;
+
+    /**
+     * Wrong codes entered since the last one was issued. Six digits is a
+     * million guesses, which is nothing without this.
+     */
+    @Column(name = "activation_attempts")
+    private Integer activationAttempts = 0;
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(

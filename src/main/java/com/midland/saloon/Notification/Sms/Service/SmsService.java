@@ -6,6 +6,7 @@ import com.midland.saloon.Notification.Sms.Model.SmsLog;
 import com.midland.saloon.Notification.Sms.Repository.SmsLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.java.Log;
+import com.midland.saloon.Uaa.Support.ActivationCode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -25,7 +26,7 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class SmsService {
 
-    public static final String TEMPLATE_USER_CREDENTIALS = "USER_CREDENTIALS";
+    public static final String TEMPLATE_ACTIVATION_CODE = "ACTIVATION_CODE";
 
     public static final String SENT = "SENT";
     public static final String FAILED = "FAILED";
@@ -42,17 +43,21 @@ public class SmsService {
     private final SmsLogRepository smsLogRepository;
 
     /**
-     * Tells a new user how to sign in.
+     * Tells a new user how to sign in for the first time.
      *
-     * The body is not kept: it carries the password, and writing it to a
-     * second table would undo the point of hashing it in the first.
+     * The code goes in the password box - saying so beats inventing a second
+     * field on the login screen that only ever matters once. The body is not
+     * kept: it carries a credential, and writing it to a second table would
+     * undo the point of hashing it in the first.
      */
-    public void sendCredentials(String uid, String phoneNumber, String username, String password) {
+    public void sendActivationCode(String uid, String phoneNumber, String username, String code) {
         String body = String.format(
-                "Karibu %s. Jina lako la kuingia: %s. Neno la siri: %s. Utaombwa kulibadilisha mara ya kwanza utakapoingia.",
-                appName, username, password
+                "Karibu %s. Jina lako la kuingia: %s. Namba ya kuingia mara ya kwanza: %s "
+                        + "(iweke sehemu ya neno la siri). Itaisha baada ya saa %d, "
+                        + "na utaombwa kuweka neno lako la siri.",
+                appName, username, code, ActivationCode.VALID_HOURS
         );
-        send(TEMPLATE_USER_CREDENTIALS, uid, phoneNumber, body, false);
+        send(TEMPLATE_ACTIVATION_CODE, uid, phoneNumber, body, false);
     }
 
     /**

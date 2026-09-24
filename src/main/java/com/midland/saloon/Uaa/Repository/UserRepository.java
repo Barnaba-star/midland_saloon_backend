@@ -71,6 +71,8 @@ public interface UserRepository extends JpaRepository<User, String> {
         u.isActive AS isActive,
         u.createdAt AS createdAt,
         u.updatedAt AS updatedAt,
+        u.mustChangePassword AS mustChangePassword,
+        u.activationExpiresAt AS activationExpiresAt,
 
         b.uid AS branchUid,
         b.branchName AS branchName,

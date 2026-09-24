@@ -49,4 +49,10 @@ public interface UserProjection {
 
     LocalDateTime getLastSeen();
 
+    /** True while the account is still on its one-time code. */
+    Boolean getMustChangePassword();
+
+    /** When that code stops working. Null once a password has been set. */
+    LocalDateTime getActivationExpiresAt();
+
 }
