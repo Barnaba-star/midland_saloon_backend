@@ -8,6 +8,7 @@ import com.midland.saloon.Setting.Repository.RoleRepository;
 import com.midland.saloon.Uaa.Dto.*;
 import com.midland.saloon.Uaa.Model.User;
 import com.midland.saloon.Uaa.Projection.UserProjection;
+import com.midland.saloon.Notification.Sms.Service.SmsService;
 import com.midland.saloon.Uaa.Repository.UserRepository;
 import com.midland.saloon.Utils.Exceptions.BusinessException;
 import com.midland.saloon.Utils.PageableParam;
@@ -35,6 +36,7 @@ public class UserService {
     private final BCryptPasswordEncoder passwordEncoder;
     private final RoleRepository roleRepository;
     private final BranchRepository branchRepository;
+    private final SmsService smsService;
 
 
     public Response<User> saveUser(UserDTO userDTO){
@@ -42,6 +44,10 @@ public class UserService {
         if(userDTO == null)
             return new Response<>("Provide User Data");
         User user=null;
+        // Credentials are only ever set when the account is created. They
+        // used to be reassigned on every save, so editing a phone number
+        // reset that person's password - and would now have texted it to them.
+        boolean isNew = userDTO.getUid() == null;
         if(userDTO.getUid() !=null){
             Optional<User> optionalUser = userRepository.findById(userDTO.getUid());
             if(optionalUser.isEmpty())
@@ -69,10 +75,32 @@ public class UserService {
         user.setBranch(branch);
 
         assert branch != null;
-        user.setUsername(userDTO.getFirstName()+ "@"  + LocalDate.now().getYear());
-        user.setPassword(passwordEncoder.encode(userDTO.getLastName()));
+
+        // Held in plain only for the length of this call, to text it to them.
+        // What is stored is the hash, as before.
+        String plainPassword = null;
+        if (isNew) {
+            user.setUsername(userDTO.getFirstName() + "@" + LocalDate.now().getYear());
+            plainPassword = userDTO.getLastName();
+            user.setPassword(passwordEncoder.encode(plainPassword));
+        }
+
         try{
-            return new Response<>(userRepository.save(user));
+            User saved = userRepository.save(user);
+
+            if (isNew) {
+                // After the save, and never blocking it: an account that
+                // exists but whose text failed is recoverable; one that was
+                // not created because a text failed is not.
+                smsService.sendCredentials(
+                        saved.getUid(),
+                        saved.getPhone(),
+                        saved.getUsername(),
+                        plainPassword
+                );
+            }
+
+            return new Response<>(saved);
         }catch (Exception e){
             e.printStackTrace();
             return new Response<>("Error in saving user");
