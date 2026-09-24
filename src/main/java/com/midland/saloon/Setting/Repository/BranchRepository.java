@@ -111,4 +111,22 @@ public interface BranchRepository extends JpaRepository<Branch, String> {
             ORDER BY b.pendingPaymentAt DESC
             """)
     List<Branch> findUnresolvedPayments();
+
+    /**
+     * Branches at or past the end of their subscription, soonest first.
+     *
+     * The platform's own ROOT branch is left out - it never pays, and the
+     * login gate exempts it, so listing it as overdue would be noise that
+     * never clears.
+     */
+    @Query("""
+            SELECT b FROM Branch b
+            WHERE b.closeSubscription IS NOT NULL
+              AND b.closeSubscription <= :horizon
+              AND UPPER(b.branchCode) <> 'ROOT'
+              AND (:createdBy IS NULL OR b.createdBy = :createdBy)
+            ORDER BY b.closeSubscription ASC
+            """)
+    List<Branch> findExpiringBranches(@Param("horizon") LocalDate horizon,
+                                      @Param("createdBy") String createdBy);
 }

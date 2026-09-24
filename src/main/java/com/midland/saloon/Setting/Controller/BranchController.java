@@ -1,6 +1,7 @@
 package com.midland.saloon.Setting.Controller;
 
 import com.midland.saloon.Setting.Dto.BranchDTO;
+import com.midland.saloon.Setting.Dto.ExpiringBranchDTO;
 import com.midland.saloon.Setting.Model.Branch;
 import com.midland.saloon.Setting.Projection.BranchProjection;
 import com.midland.saloon.Setting.Service.BranchService;
@@ -57,5 +58,15 @@ public class BranchController {
     @GetMapping ("/findAllUsersWithBranchAndRoles/{branchUID}")
     public ResponseList<User> findAllUsersWithBranchAndRoles(@PathVariable String branchUID){
         return branchService.findAllUsersWithBranchAndRoles(branchUID);
+    }
+
+    /**
+     * The branches worth chasing: running out soon, or already lapsed.
+     * Same permission as the branch list, and narrowed the same way.
+     */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_ALL_BRANCHES')")
+    @GetMapping("/findExpiringBranches")
+    public ResponseList<ExpiringBranchDTO> findExpiringBranches(@RequestParam(required = false) Integer days) {
+        return branchService.findExpiringBranches(days);
     }
 }

@@ -1,5 +1,12 @@
 package com.midland.saloon.Setting.Service;
 import com.midland.saloon.Config.Security.LoggerUser;
+import com.midland.saloon.Setting.Dto.ExpiringBranchDTO;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import com.midland.saloon.Setting.Dto.BranchDTO;
 import com.midland.saloon.Setting.Model.Branch;
 import com.midland.saloon.Setting.Model.BranchCodeHelper;
@@ -268,4 +275,56 @@ public class BranchService {
             return new ResponseList<>("Branch Not Found");
         return new ResponseList<>(userRepository.findAllUsersWithBranchAndRoles(branchUID));
     }
+
+    /**
+     * Branches running out within the next few days, and any already past
+     * their date. Sorted soonest first, so the one to call about is the one
+     * at the top.
+     *
+     * Scoped the same way the branch list is: a STAFF member sees only the
+     * branches they registered.
+     */
+    public ResponseList<ExpiringBranchDTO> findExpiringBranches(Integer days) {
+        int window = days == null || days < 0 ? 7 : Math.min(days, 365);
+        LocalDate today = LocalDate.now();
+        LocalDate horizon = today.plusDays(window);
+
+        String createdBy = seesAllBranches() ? null : LoggerUser.getUser().getUid();
+        List<Branch> branches = branchRepository.findExpiringBranches(horizon, createdBy);
+
+        // Names of whoever registered them, in one query rather than one per row.
+        Set<String> creatorUids = branches.stream()
+                .map(Branch::getCreatedBy)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<String, String> creatorNames = new HashMap<>();
+        if (!creatorUids.isEmpty()) {
+            for (User creator : userRepository.findAllById(creatorUids)) {
+                String name = String.format("%s %s",
+                        creator.getFirstName() == null ? "" : creator.getFirstName(),
+                        creator.getLastName() == null ? "" : creator.getLastName()).trim();
+                creatorNames.put(creator.getUid(), name.isBlank() ? creator.getUsername() : name);
+            }
+        }
+
+        List<ExpiringBranchDTO> rows = new ArrayList<>();
+        for (Branch branch : branches) {
+            ExpiringBranchDTO row = new ExpiringBranchDTO();
+            row.setUid(branch.getUid());
+            row.setBranchName(branch.getBranchName());
+            row.setBranchCode(branch.getBranchCode());
+            row.setRegion(branch.getRegion());
+            row.setPhone(branch.getPhone());
+            row.setCloseSubscription(branch.getCloseSubscription());
+            // Negative once past: "3 days ago" rather than "-3 days left".
+            row.setDaysLeft(ChronoUnit.DAYS.between(today, branch.getCloseSubscription()));
+            row.setSubscriptionStatus(branch.getSubscriptionStatus());
+            row.setSubscriptionAmount(branch.getSubscriptionAmount());
+            row.setRegisteredBy(creatorNames.get(branch.getCreatedBy()));
+            row.setLastPaymentFailure(branch.getLastPaymentFailure());
+            rows.add(row);
+        }
+        return new ResponseList<>(rows);
+    }
+
 }
