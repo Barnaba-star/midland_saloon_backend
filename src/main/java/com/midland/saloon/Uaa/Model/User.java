@@ -139,5 +139,13 @@ public class User extends BaseEntity {
     @Column(name = "bank_name", length = 100)
     private String bankName;
 
+    /**
+     * The name the account is held in. Not the same thing as the name above:
+     * a bank checks what it has on file, and "Grace Ally" on the payroll
+     * against "G. A. Mwakalinga" at the counter is a rejected transfer.
+     */
+    @Column(name = "account_name", length = 150)
+    private String accountName;
+
 
 }

@@ -8,8 +8,9 @@ import lombok.Setter;
 /**
  * Where somebody's payroll money is sent.
  *
- * Both parts or neither: an account number with no bank cannot be paid to,
- * and a bank with no account number says nothing.
+ * All three or none: a number with no bank cannot be paid to, a bank with
+ * no number says nothing, and a transfer with no account name is refused at
+ * the counter.
  */
 @Getter
 @Setter
@@ -18,4 +19,5 @@ import lombok.Setter;
 public class BankDetailsDTO {
     private String accountNumber;
     private String bankName;
+    private String accountName;
 }

@@ -78,6 +78,9 @@ public class UserService {
         if (userDTO.getBankName() != null) {
             user.setBankName(userDTO.getBankName().trim());
         }
+        if (userDTO.getAccountName() != null) {
+            user.setAccountName(userDTO.getAccountName().trim());
+        }
         Branch branch= null;
         if(userDTO.getBranch() !=null){
             Optional<Branch> optionalBranch = branchRepository.findById(userDTO.getBranch());
@@ -238,7 +241,8 @@ public class UserService {
         }
         return new Response<>(new BankDetailsDTO(
                 user.get().getAccountNumber(),
-                user.get().getBankName()
+                user.get().getBankName(),
+                user.get().getAccountName()
         ));
     }
 
@@ -270,6 +274,7 @@ public class UserService {
         // not got the new number yet should not be left with the old one.
         String number = blankToNull(details == null ? null : details.getAccountNumber());
         String bank = blankToNull(details == null ? null : details.getBankName());
+        String accountName = blankToNull(details == null ? null : details.getAccountName());
 
         if (number != null && number.length() > 50) {
             return data("TOO_LONG");
@@ -277,15 +282,22 @@ public class UserService {
         if (bank != null && bank.length() > 100) {
             return data("TOO_LONG");
         }
-        // One without the other cannot be paid to, so it is not a saveable
-        // state - better refused here than found out at the bank counter.
-        if ((number == null) != (bank == null)) {
+        if (accountName != null && accountName.length() > 150) {
+            return data("TOO_LONG");
+        }
+        // Any one of the three on its own cannot be paid to, so a partial
+        // record is not a saveable state - better refused here than found
+        // out at the bank counter.
+        boolean anySet = number != null || bank != null || accountName != null;
+        boolean allSet = number != null && bank != null && accountName != null;
+        if (anySet && !allSet) {
             return data("INCOMPLETE");
         }
 
         User user = optionalUser.get();
         user.setAccountNumber(number);
         user.setBankName(bank);
+        user.setAccountName(accountName);
         userRepository.save(user);
         return data("SAVED");
     }

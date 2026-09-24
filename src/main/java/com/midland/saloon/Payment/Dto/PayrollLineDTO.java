@@ -27,6 +27,9 @@ public class PayrollLineDTO {
     /** And which bank it is at; an account number alone cannot be paid to. */
     private String bankName;
 
+    /** The name the account is held in, which the bank checks against. */
+    private String accountName;
+
     /** What the month earned them. */
     private long earned;
 

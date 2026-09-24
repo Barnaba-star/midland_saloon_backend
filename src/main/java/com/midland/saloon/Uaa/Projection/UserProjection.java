@@ -54,6 +54,8 @@ public interface UserProjection {
 
     String getBankName();
 
+    String getAccountName();
+
     /** True while the account is still on its one-time code. */
     Boolean getMustChangePassword();
 

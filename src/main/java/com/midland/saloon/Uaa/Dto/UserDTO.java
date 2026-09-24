@@ -37,4 +37,5 @@ public class UserDTO {
     /** Optional: most people add these themselves later, from their profile. */
     private String accountNumber;
     private String bankName;
+    private String accountName;
 }

@@ -112,7 +112,8 @@ public class PayrollService {
         payroll.setMissingAccount((int) lines.stream()
                 .filter(line -> line.getToPay() > 0)
                 .filter(line -> line.getAccountNumber() == null || line.getAccountNumber().isBlank()
-                        || line.getBankName() == null || line.getBankName().isBlank())
+                        || line.getBankName() == null || line.getBankName().isBlank()
+                        || line.getAccountName() == null || line.getAccountName().isBlank())
                 .count());
 
         return new Response<>(payroll);
@@ -138,6 +139,7 @@ public class PayrollService {
                 line.setPhone(user.getPhone());
                 line.setAccountNumber(user.getAccountNumber());
                 line.setBankName(user.getBankName());
+                line.setAccountName(user.getAccountName());
             }
         }
     }
