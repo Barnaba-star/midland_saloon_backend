@@ -4,6 +4,9 @@ import com.midland.saloon.Setting.Model.Branch;
 import com.midland.saloon.Uaa.Dto.DataDTO;
 import com.midland.saloon.Uaa.Dto.LoginDTO;
 import com.midland.saloon.Uaa.Model.User;
+import jakarta.validation.Valid;
+import com.midland.saloon.Setting.Dto.ExpiredSubscriptionPaymentDTO;
+import com.midland.saloon.Setting.Service.SettingService;
 import com.midland.saloon.Setting.Service.PlatformSettingService;
 import com.midland.saloon.Uaa.Repository.UserRepository;
 import com.midland.saloon.Uaa.Service.UserService;
@@ -22,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestController
@@ -34,6 +38,7 @@ public class UserController {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenUtil jwtTokenUtil;
     private final PlatformSettingService platformSettingService;
+    private final SettingService settingService;
 
 
 
@@ -85,9 +90,16 @@ public class UserController {
                 && branch != null
                 && branch.getCloseSubscription() != null
                 && branch.getCloseSubscription().isBefore(lockoutDate)) {
-            return ResponseEntity
-                    .status(HttpStatus.FORBIDDEN)
-                    .body("Subscription Expired. Please pay to continue using the system.");
+            // Structured rather than plain text: the login screen needs to
+            // tell this apart from a wrong password so it can offer a way to
+            // pay, and it needs the monthly figure to price the months.
+            Map<String, Object> expired = new LinkedHashMap<>();
+            expired.put("status", 403);
+            expired.put("code", "SUBSCRIPTION_EXPIRED");
+            expired.put("message", "Subscription Expired. Please pay to continue using the system.");
+            expired.put("branchName", branch.getBranchName());
+            expired.put("monthlyAmount", branch.getSubscriptionAmount());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(expired);
         }
 
         try {
@@ -115,4 +127,14 @@ public class UserController {
         return userService.changePassword(dataDTO);
     }
 
+    /**
+     * The way out of the dead end: a branch whose subscription has lapsed
+     * cannot log in, so it cannot reach the normal payment screen either.
+     * This sits under /authentication (open by design) and re-checks the
+     * credentials itself. It issues no token - paying is all it does.
+     */
+    @PostMapping("/paySubscription")
+    public Response<Branch> paySubscription(@Valid @RequestBody ExpiredSubscriptionPaymentDTO dto) {
+        return settingService.payExpiredSubscription(dto);
+    }
 }

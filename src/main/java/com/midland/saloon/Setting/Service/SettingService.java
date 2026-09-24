@@ -10,6 +10,9 @@ import com.midland.saloon.Setting.Model.Branch;
 import com.midland.saloon.Setting.Repository.BranchRepository;
 import com.midland.saloon.Setting.Repository.DatabaseMonitoringRepository;
 import com.midland.saloon.Uaa.Model.User;
+import com.midland.saloon.Setting.Dto.ExpiredSubscriptionPaymentDTO;
+import com.midland.saloon.Uaa.Repository.UserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import com.midland.saloon.Utils.Responses.Response;
 import com.midland.saloon.Utils.Responses.ResponseList;
 import lombok.extern.java.Log;
@@ -28,13 +31,17 @@ public class SettingService {
     private final BranchService branchService;
     private final SnippeClient snippeClient;
     private final PlatformSettingService platformSettingService;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public SettingService(DatabaseMonitoringRepository repository, BranchRepository branchRepository, SnippeClient snippeClient, BranchService branchService, PlatformSettingService platformSettingService) {
+    public SettingService(DatabaseMonitoringRepository repository, BranchRepository branchRepository, SnippeClient snippeClient, BranchService branchService, PlatformSettingService platformSettingService, UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.repository = repository;
         this.branchRepository = branchRepository;
         this.snippeClient = snippeClient;
         this.branchService = branchService;
         this.platformSettingService = platformSettingService;
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public ResponseList<TableSizeDto> getTableSizes() {
@@ -114,23 +121,78 @@ public class SettingService {
         if (amount < minimumPaymentAmount)
             return new Response<>("The Total Is Below The Minimum Of " + minimumPaymentAmount + " TZS, Choose More Months");
 
-        User user = LoggerUser.getUser();
+        return startSubscriptionPayment(branch, LoggerUser.getUser(), subscriptionPaymentDTO.getMonths(), subscriptionPaymentDTO.getPhoneNumber());
+    }
+
+    /**
+     * Paying for a branch whose subscription has already lapsed, from the
+     * login screen. There is no token at that point - the customer cannot get
+     * one until they have paid - so the credentials are checked again here,
+     * exactly as /login checks them.
+     *
+     * Deliberately narrow: it works only while the branch really is expired,
+     * and it never issues a token. The most it can do is start a payment for
+     * a branch whose password the caller already knows.
+     */
+    public Response<Branch> payExpiredSubscription(ExpiredSubscriptionPaymentDTO dto) {
+        if (dto == null)
+            return new Response<>("Provide Subscription Payment Details");
+        if (dto.getMonths() == null || dto.getMonths() <= 0)
+            return new Response<>("Provide A Valid Number Of Months");
+
+        User user = userRepository.findByUsernameForAuthentication(dto.getUsername());
+        // One message for "no such user" and "wrong password" alike, so this
+        // cannot be used to find out which branches exist.
+        if (user == null || !passwordEncoder.matches(dto.getPassword(), user.getPassword()))
+            return new Response<>("Invalid Username or Password");
+
+        if (Boolean.TRUE.equals(user.getIsBlocked()))
+            return new Response<>("Account Blocked");
+
+        Branch branch = user.getBranch();
+        if (branch == null)
+            return new Response<>("User Has No Branch");
+
+        // If they can still log in, they should - this route exists only for
+        // the case where the normal one is closed to them.
+        Integer graceDays = platformSettingService.current().getGracePeriodDays();
+        LocalDate lockoutDate = LocalDate.now().minusDays(graceDays == null ? 0 : graceDays);
+        boolean expired = branch.getCloseSubscription() != null
+                && branch.getCloseSubscription().isBefore(lockoutDate);
+        if (!expired)
+            return new Response<>("This Branch Is Active, Please Log In");
+
+        log.info(dto.getUsername() + " is paying for an expired subscription");
+        return startSubscriptionPayment(branch, user, dto.getMonths(), dto.getPhoneNumber());
+    }
+
+    /** Shared by both routes: price it, hand off to Snippe, mark it pending. */
+    private Response<Branch> startSubscriptionPayment(Branch branch, User user, int months, String phoneNumber) {
+
+        if (branch.getSubscriptionAmount() == null || branch.getSubscriptionAmount() <= 0)
+            return new Response<>("This Branch Has No Subscription Plan Configured Yet, Contact Admin");
+
+        int amount = branch.getSubscriptionAmount() * months;
+
+        int minimum = platformSettingService.current().getMinimumPaymentAmount();
+        if (amount < minimum)
+            return new Response<>("The Total Is Below The Minimum Of " + minimum + " TZS, Choose More Months");
 
         SnippePaymentResult result = snippeClient.createMobilePayment(
                 amount,
-                subscriptionPaymentDTO.getPhoneNumber(),
+                phoneNumber,
                 user.getFirstName(),
                 user.getLastName(),
                 user.getEmail(),
                 branch.getUid(),
-                subscriptionPaymentDTO.getMonths()
+                months
         );
 
         if(!result.isSuccess())
             return new Response<>(result.getMessage() != null ? result.getMessage() : "Failed To Initiate Payment");
 
         branch.setSubscriptionStatus("PENDING");
-        branch.setSubscriptionPhoneNumber(subscriptionPaymentDTO.getPhoneNumber());
+        branch.setSubscriptionPhoneNumber(phoneNumber);
 
         try {
             branch = branchRepository.save(branch);
