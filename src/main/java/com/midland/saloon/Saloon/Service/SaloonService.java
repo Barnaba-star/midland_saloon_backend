@@ -2897,4 +2897,48 @@ public class SaloonService {
     }
 
 
+
+    /***
+     POS_HOME_DASHBOARD
+     */
+
+    /** The four headline numbers for the signed-in user's own branch. */
+    public Response<DashboardSummaryDTO> findBranchDashboard() {
+        String branchUID = LoggerUser.getBranchUID();
+        LocalDate today = LocalDate.now();
+
+        DashboardSummaryDTO summary = new DashboardSummaryDTO();
+        summary.setTodayRevenue(saloonReportsRepository.totalRevenueOn(branchUID, today));
+        summary.setYesterdayRevenue(saloonReportsRepository.totalRevenueOn(branchUID, today.minusDays(1)));
+        summary.setServicesSoldToday(saloonReportsRepository.countServicesSoldOn(branchUID, today));
+        summary.setPendingBillsCount(salesOpenedRepository.countPendingBills(branchUID));
+        summary.setPendingBillsAmount(salesOpenedRepository.pendingBillsAmount(branchUID));
+        summary.setOpenStores(openStoreRepository.countOpenStores(branchUID));
+        summary.setTotalStores(storeRepository.countStores(branchUID));
+        return new Response<>(summary);
+    }
+
+    /**
+     * Revenue per day for the home page's trend line. Days the branch took
+     * nothing have no report rows at all, so they are filled in as zero here -
+     * otherwise the line would join Friday straight to Monday and read as if
+     * the weekend never happened.
+     */
+    public ResponseList<DailyRevenueDTO> findRevenueTrend(int days) {
+        int span = days < 1 ? 30 : Math.min(days, 365);
+        LocalDate today = LocalDate.now();
+        LocalDate start = today.minusDays(span - 1L);
+
+        Map<LocalDate, Long> byDate = new HashMap<>();
+        for (RevenueTrendProjection point : saloonReportsRepository.revenueTrend(LoggerUser.getBranchUID(), start)) {
+            byDate.put(point.getDate(), point.getAmount() == null ? 0L : point.getAmount());
+        }
+
+        List<DailyRevenueDTO> trend = new ArrayList<>();
+        for (LocalDate date = start; !date.isAfter(today); date = date.plusDays(1)) {
+            trend.add(new DailyRevenueDTO(date, byDate.getOrDefault(date, 0L)));
+        }
+        return new ResponseList<>(trend);
+    }
+
 }

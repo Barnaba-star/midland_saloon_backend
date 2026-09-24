@@ -330,4 +330,17 @@ public class SaloonController {
         return saloonService.closeOpenStore(storeDTO);
     }
 
+    // ---- POS home dashboard ----
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_SALES')")
+    @GetMapping("/findBranchDashboard")
+    public Response<DashboardSummaryDTO> findBranchDashboard() {
+        return saloonService.findBranchDashboard();
+    }
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_REPORT')")
+    @GetMapping("/findRevenueTrend/{days}")
+    public ResponseList<DailyRevenueDTO> findRevenueTrend(@PathVariable int days) {
+        return saloonService.findRevenueTrend(days);
+    }
 }
