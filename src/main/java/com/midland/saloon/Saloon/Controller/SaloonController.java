@@ -343,4 +343,10 @@ public class SaloonController {
     public ResponseList<DailyRevenueDTO> findRevenueTrend(@PathVariable int days) {
         return saloonService.findRevenueTrend(days);
     }
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_REPORT')")
+    @GetMapping("/findStaffEarnings")
+    public ResponseList<StaffEarningsProjection> findStaffEarnings() {
+        return saloonService.findStaffEarnings();
+    }
 }

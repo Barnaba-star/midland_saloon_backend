@@ -2941,4 +2941,13 @@ public class SaloonService {
         return new ResponseList<>(trend);
     }
 
+
+    /** Staff ranked by what they earned the branch this month. */
+    public ResponseList<StaffEarningsProjection> findStaffEarnings() {
+        LocalDate monthStart = LocalDate.now().withDayOfMonth(1);
+        return new ResponseList<>(
+                saloonReportsRepository.staffEarningsSince(LoggerUser.getBranchUID(), monthStart)
+        );
+    }
+
 }

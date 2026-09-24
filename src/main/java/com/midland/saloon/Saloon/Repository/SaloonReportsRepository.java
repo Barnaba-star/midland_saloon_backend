@@ -2,6 +2,7 @@ package com.midland.saloon.Saloon.Repository;
 
 import com.midland.saloon.Saloon.Model.SaloonReports;
 import com.midland.saloon.Saloon.Projection.RevenueTrendProjection;
+import com.midland.saloon.Saloon.Projection.StaffEarningsProjection;
 import com.midland.saloon.Saloon.Projection.SaloonProjection;
 import com.midland.saloon.Saloon.Projection.SaloonServiceRevenueProjection;
 import com.midland.saloon.Utils.Responses.Response;
@@ -312,4 +313,23 @@ public interface SaloonReportsRepository extends JpaRepository<SaloonReports, St
             ORDER BY r.createdAt
             """)
     List<RevenueTrendProjection> revenueTrend(@Param("branchUID") String branchUID, @Param("startDate") LocalDate startDate);
+
+    // Who brought in what. staffAmount is the cut that belongs to the person
+    // who did the service, so summing it by staff ranks them by contribution
+    // rather than by how many services they happened to touch.
+    @Query("""
+            SELECT st.uid AS staffUid,
+                   st.firstName AS firstName,
+                   st.lastName AS lastName,
+                   COALESCE(SUM(COALESCE(r.staffAmount, 0)), 0) AS earned,
+                   COUNT(r) AS servicesDone
+            FROM SaloonReports r
+            LEFT JOIN r.saloonStaff st
+            WHERE r.branchUid = :branchUID
+              AND r.createdAt >= :startDate
+              AND st.uid IS NOT NULL
+            GROUP BY st.uid, st.firstName, st.lastName
+            ORDER BY COALESCE(SUM(COALESCE(r.staffAmount, 0)), 0) DESC
+            """)
+    List<StaffEarningsProjection> staffEarningsSince(@Param("branchUID") String branchUID, @Param("startDate") LocalDate startDate);
 }
