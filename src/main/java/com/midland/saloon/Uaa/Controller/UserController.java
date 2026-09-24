@@ -99,6 +99,10 @@ public class UserController {
             expired.put("code", "SUBSCRIPTION_EXPIRED");
             expired.put("branchName", branch.getBranchName());
             expired.put("monthlyAmount", branch.getSubscriptionAmount());
+            // Whether a payment was already tried, and how it went. Without
+            // this the screen repeats "expired" after a declined payment and
+            // says nothing about why paying did not help.
+            expired.put("subscriptionStatus", branch.getSubscriptionStatus());
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(expired);
         }
 
