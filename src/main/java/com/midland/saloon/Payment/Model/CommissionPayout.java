@@ -29,6 +29,17 @@ import java.time.LocalDate;
 })
 public class CommissionPayout extends BaseEntity {
 
+    /**
+     * Which share this payout settles: STAFF, DIRECTOR or ROOT. One ledger
+     * for all three rather than a table each - the same question is being
+     * answered, and a second table would drift.
+     *
+     * Rows written before this column existed are staff commission, which is
+     * why every read treats null as STAFF.
+     */
+    @Column(name = "role_code", length = 20)
+    private String roleCode = "STAFF";
+
     @Column(name = "staff_uid", nullable = false)
     private String staffUid;
 

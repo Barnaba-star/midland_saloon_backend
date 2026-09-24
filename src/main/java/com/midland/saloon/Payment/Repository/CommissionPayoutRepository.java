@@ -25,6 +25,7 @@ public interface CommissionPayoutRepository extends JpaRepository<CommissionPayo
     FROM CommissionPayout p
     WHERE p.periodYear = :year
       AND p.periodMonth = :month
+      AND (p.roleCode IS NULL OR p.roleCode = 'STAFF')
     GROUP BY p.staffUid
 """)
     List<PayoutTotalProjection> totalsForPeriod(
@@ -45,4 +46,21 @@ public interface CommissionPayoutRepository extends JpaRepository<CommissionPayo
             @Param("year") int year,
             @Param("month") int month
     );
+
+    /**
+     * What one person has already been paid for one month against one share.
+     * Null roleCode counts as STAFF - see CommissionPayout.roleCode.
+     */
+    @Query("""
+    SELECT COALESCE(SUM(p.amount), 0)
+    FROM CommissionPayout p
+    WHERE p.staffUid = :uid
+      AND p.periodYear = :year
+      AND p.periodMonth = :month
+      AND (COALESCE(p.roleCode, 'STAFF') = :roleCode)
+""")
+    long paidForShare(@Param("uid") String uid,
+                      @Param("roleCode") String roleCode,
+                      @Param("year") int year,
+                      @Param("month") int month);
 }

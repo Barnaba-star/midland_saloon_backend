@@ -74,6 +74,19 @@ public class PaymentController {
         return revenueShareService.findShareRecipients(role, year, month);
     }
 
+    /** Records that one person's share for the month has been handed over. */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('PAY_COMMISSION')")
+    @PostMapping("/payShare/{role}/{uid}")
+    public Response<String> payShare(
+            @PathVariable String role,
+            @PathVariable String uid,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) String note
+    ) {
+        return revenueShareService.payShare(role, uid, year, month, note);
+    }
+
     /** Payments started and never resolved - the ones worth chasing. */
     @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_PAYMENTS')")
     @GetMapping("/findUnresolvedPayments")
