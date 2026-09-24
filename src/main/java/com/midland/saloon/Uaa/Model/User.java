@@ -124,5 +124,13 @@ public class User extends BaseEntity {
     @Column(name = "profile_image")
     private String profileImage;
 
+    /**
+     * Where this person's share of the month is sent. Read off the payroll
+     * by whoever takes it to the bank, so it is theirs to set - an account
+     * number typed in on somebody's behalf is a dispute waiting to happen.
+     */
+    @Column(name = "account_number", length = 50)
+    private String accountNumber;
+
 
 }

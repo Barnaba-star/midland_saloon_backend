@@ -105,6 +105,12 @@ public class PayrollService {
         payroll.setMissingPhone((int) lines.stream()
                 .filter(line -> line.getPhone() == null || line.getPhone().isBlank())
                 .count());
+        // Counted only among people actually owed something: somebody
+        // already settled has no missing detail worth chasing this month.
+        payroll.setMissingAccount((int) lines.stream()
+                .filter(line -> line.getToPay() > 0)
+                .filter(line -> line.getAccountNumber() == null || line.getAccountNumber().isBlank())
+                .count());
 
         return new Response<>(payroll);
     }
@@ -127,6 +133,7 @@ public class PayrollService {
             User user = byUid.get(line.getUid());
             if (user != null) {
                 line.setPhone(user.getPhone());
+                line.setAccountNumber(user.getAccountNumber());
             }
         }
     }

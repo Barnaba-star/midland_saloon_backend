@@ -49,6 +49,9 @@ public interface UserProjection {
 
     LocalDateTime getLastSeen();
 
+    /** Where the payroll sends this person's share. */
+    String getAccountNumber();
+
     /** True while the account is still on its one-time code. */
     Boolean getMustChangePassword();
 

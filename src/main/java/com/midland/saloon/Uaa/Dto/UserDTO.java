@@ -33,4 +33,7 @@ public class UserDTO {
     private String phone;
     @NotNull(message = "Provide Root Status")
     private Boolean isRoot;
+
+    /** Optional: most people add this themselves later, from their profile. */
+    private String accountNumber;
 }

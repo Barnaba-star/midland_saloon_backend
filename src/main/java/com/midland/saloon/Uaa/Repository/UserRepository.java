@@ -84,6 +84,7 @@ public interface UserRepository extends JpaRepository<User, String> {
         u.updatedAt AS updatedAt,
         u.mustChangePassword AS mustChangePassword,
         u.activationExpiresAt AS activationExpiresAt,
+        u.accountNumber AS accountNumber,
 
         b.uid AS branchUid,
         b.branchName AS branchName,
@@ -128,7 +129,7 @@ public interface UserRepository extends JpaRepository<User, String> {
         u.firstName AS firstName,
         u.middleName AS middleName,
         u.lastName AS lastName,
-
+        u.accountNumber AS accountNumber,
 
         r.name AS roleName,
         r.uid AS roleUID,

@@ -47,5 +47,11 @@ public class PayrollDTO {
      */
     private int missingPhone;
 
+    /**
+     * And how many of those still owed money have no account number. The
+     * sheet cannot instruct a transfer without one.
+     */
+    private int missingAccount;
+
     private List<PayrollLineDTO> lines;
 }

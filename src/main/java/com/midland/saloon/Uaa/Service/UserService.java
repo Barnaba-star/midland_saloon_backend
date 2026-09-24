@@ -1,5 +1,6 @@
 package com.midland.saloon.Uaa.Service;
 
+import com.midland.saloon.Config.Security.AuthChecker;
 import com.midland.saloon.Config.Security.LoggerUser;
 import com.midland.saloon.Setting.Model.Branch;
 import com.midland.saloon.Setting.Model.Role;
@@ -39,6 +40,7 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final BranchRepository branchRepository;
     private final SmsService smsService;
+    private final AuthChecker authChecker;
 
     // Matches the minimum the change-password dialog enforces.
     private static final int MIN_PASSWORD_LENGTH = 6;
@@ -70,6 +72,9 @@ public class UserService {
         user.setFirstName(userDTO.getFirstName());
         user.setDateOfBirth(userDTO.getDob());
         user.setAddress(userDTO.getAddress());
+        if (userDTO.getAccountNumber() != null) {
+            user.setAccountNumber(userDTO.getAccountNumber().trim());
+        }
         Branch branch= null;
         if(userDTO.getBranch() !=null){
             Optional<Branch> optionalBranch = branchRepository.findById(userDTO.getBranch());
@@ -195,14 +200,80 @@ public class UserService {
             return new Response<>("User Not Found");
         User user = optionalUser.get();
         if (!Boolean.TRUE.equals(user.getMustChangePassword()))
-            return new Response<>("ALREADY_ACTIVATED");
+            return data("ALREADY_ACTIVATED");
         if (user.getPhone() == null || user.getPhone().isBlank())
-            return new Response<>("NO_PHONE");
+            return data("NO_PHONE");
 
         String code = issueActivationCode(user);
         User saved = userRepository.save(user);
         smsService.sendActivationCode(saved.getUid(), saved.getPhone(), saved.getUsername(), code);
-        return new Response<>("SENT");
+        return data("SENT");
+    }
+
+    /**
+     * A Response whose payload really is the string.
+     *
+     * Response has both Response(T data) and Response(String message), and
+     * for a Response<String> both match a string argument - Java picks the
+     * message one. So `new Response<>("SENT")` quietly returned an empty
+     * body with a message, and every caller reading res.data saw nothing.
+     * Building it explicitly is the only way to say which was meant.
+     */
+    private static Response<String> data(String value) {
+        Response<String> response = new Response<>();
+        response.setData(value);
+        response.setStatus(com.midland.saloon.Utils.Responses.ResponseStatus.SUCCESS);
+        return response;
+    }
+
+    /** The caller's own, so a profile can show it without VIEW_USER. */
+    public Response<String> findMyAccountNumber() {
+        User caller = LoggerUser.getUser();
+        Optional<User> user = userRepository.findById(caller.getUid());
+        if (user.isEmpty()) {
+            return new Response<>("User Not Found");
+        }
+        String number = user.get().getAccountNumber();
+        return data(number == null ? "" : number);
+    }
+
+    /**
+     * Sets where somebody's payroll money is sent.
+     *
+     * Anyone may set their own; changing somebody else's needs SAVE_USER.
+     * It is a narrow endpoint rather than part of saveUser because the
+     * screens that call it hold one field, and a full save from a form that
+     * does not carry the rest would quietly blank it.
+     */
+    public Response<String> saveAccountNumber(String userUID, String accountNumber) {
+        log.info(LoggerUser.getEmail() + " is setting an account number");
+
+        User caller = LoggerUser.getUser();
+        String target = userUID == null || userUID.isBlank() ? caller.getUid() : userUID;
+
+        if (!target.equals(caller.getUid()) && !authChecker.hasPermissionOrRoot("SAVE_USER")) {
+            return data("NOT_ALLOWED");
+        }
+
+        Optional<User> optionalUser = userRepository.findById(target);
+        if (optionalUser.isEmpty()) {
+            return new Response<>("User Not Found");
+        }
+
+        String cleaned = accountNumber == null ? null : accountNumber.trim();
+        if (cleaned != null && cleaned.isEmpty()) {
+            // Clearing it is a real choice - somebody who changed bank and has
+            // not got the new number yet should not be left with the old one.
+            cleaned = null;
+        }
+        if (cleaned != null && cleaned.length() > 50) {
+            return data("TOO_LONG");
+        }
+
+        User user = optionalUser.get();
+        user.setAccountNumber(cleaned);
+        userRepository.save(user);
+        return data("SAVED");
     }
 
     @Transactional
