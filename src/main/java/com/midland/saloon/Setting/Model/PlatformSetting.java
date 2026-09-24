@@ -31,11 +31,15 @@ public class PlatformSetting extends BaseEntity {
     @Column(name = "commission_percent")
     private Integer commissionPercent = 10;
 
-    /** Share of a month's takings each DIRECTOR is due. Multiplied by how many hold the role. */
+    /**
+     * Share of a month's takings the DIRECTOR role is due in total, divided
+     * between however many hold it. Not a percentage each: that made the
+     * month cost more with every appointment, without limit.
+     */
     @Column(name = "director_percent")
-    private Integer directorPercent = 10;
+    private Integer directorPercent = 20;
 
-    /** Share of a month's takings ROOT is due. */
+    /** Share of a month's takings the ROOT role is due, split the same way. */
     @Column(name = "root_percent")
     private Integer rootPercent = 25;
 

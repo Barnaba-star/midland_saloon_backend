@@ -65,11 +65,18 @@ public class RevenueShareService {
         share.setStaffPercent(orZero(setting.getCommissionPercent()));
         share.setStaffAmount(staffAmount);
 
+        // A pool for the role, divided among whoever holds it - not a
+        // percentage each. Multiplying by the count made the company's
+        // obligation grow with every director appointed: three directors at
+        // 10% each took 30% of the month, and nothing capped it. Directors
+        // and root work the same way; only staff earn individually, and they
+        // earn it per branch they registered themselves.
         share.setDirectorPercent(orZero(setting.getDirectorPercent()));
         share.setDirectorCount(directorCount);
-        share.setDirectorAmount(percentOf(revenue, (long) share.getDirectorPercent() * directorCount));
+        share.setDirectorAmount(percentOf(revenue, share.getDirectorPercent()));
 
         share.setRootPercent(orZero(setting.getRootPercent()));
+        share.setRootCount(userRepository.findAllByRoleCode(ROOT_ROLE_CODE).size());
         share.setRootAmount(percentOf(revenue, share.getRootPercent()));
 
         // Clamped at zero: percentages that add past 100 would otherwise show

@@ -25,12 +25,17 @@ public class RevenueShareDTO {
     private int staffPercent;
     private long staffAmount;
 
-    /** Each director's share, multiplied by however many hold the role today. */
+    /**
+     * One share for the role, split between however many hold it - so a
+     * second director halves what each takes rather than doubling what the
+     * month costs. Root works identically.
+     */
     private int directorPercent;
     private int directorCount;
     private long directorAmount;
 
     private int rootPercent;
+    private int rootCount;
     private long rootAmount;
 
     /** Whatever the three shares leave behind - never below zero. */
