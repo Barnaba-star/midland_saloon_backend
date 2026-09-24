@@ -90,13 +90,13 @@ public class UserController {
                 && branch != null
                 && branch.getCloseSubscription() != null
                 && branch.getCloseSubscription().isBefore(lockoutDate)) {
-            // Structured rather than plain text: the login screen needs to
-            // tell this apart from a wrong password so it can offer a way to
-            // pay, and it needs the monthly figure to price the months.
+            // A code and the figures, deliberately no message: the wording a
+            // customer reads belongs to the screen, which has it translated.
+            // Sending one here would only get shown instead - in English, and
+            // phrased like a service layer.
             Map<String, Object> expired = new LinkedHashMap<>();
             expired.put("status", 403);
             expired.put("code", "SUBSCRIPTION_EXPIRED");
-            expired.put("message", "Subscription Expired. Please pay to continue using the system.");
             expired.put("branchName", branch.getBranchName());
             expired.put("monthlyAmount", branch.getSubscriptionAmount());
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(expired);
