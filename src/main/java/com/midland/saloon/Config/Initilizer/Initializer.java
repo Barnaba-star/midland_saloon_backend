@@ -3,6 +3,8 @@ import com.midland.saloon.Setting.Model.Branch;
 import com.midland.saloon.Setting.Model.Role;
 import com.midland.saloon.Setting.Repository.BranchRepository;
 import com.midland.saloon.Setting.Repository.RoleRepository;
+import com.midland.saloon.Setting.Model.BranchCodeHelper;
+import com.midland.saloon.Setting.Service.RegionService;
 import com.midland.saloon.Setting.Service.PlatformSettingService;
 import com.midland.saloon.Uaa.Model.Permission;
 import com.midland.saloon.Uaa.Model.User;
@@ -39,6 +41,7 @@ public class Initializer implements ApplicationRunner {
     private final BCryptPasswordEncoder passwordEncoder;
     private final BranchRepository branchRepository;
     private final PlatformSettingService platformSettingService;
+    private final RegionService regionService;
 
 
     @Override
@@ -49,6 +52,7 @@ public class Initializer implements ApplicationRunner {
         seedSuperUser();
         seedRootBranch();
         platformSettingService.seedIfMissing();
+        regionService.seedIfMissing(BranchCodeHelper.SEED_REGION_CODES);
     }
 
     public void seedPermissions() throws Exception {
@@ -184,7 +188,8 @@ public class Initializer implements ApplicationRunner {
                         // Settings > Errors, so a DIRECTOR can see what broke
                         // without going through ROOT.
                         "VIEW_ERROR_LOG", "DELETE_ERROR_LOG", "VIEW_AUDIT_LOG",
-                        "VIEW_PAYMENTS", "RECONCILE_PAYMENTS"
+                        "VIEW_PAYMENTS", "RECONCILE_PAYMENTS",
+                        "SAVE_REGION", "DELETE_REGION"
                 )
         );
         // STAFF registers branches (only ever seeing its own) and sets up

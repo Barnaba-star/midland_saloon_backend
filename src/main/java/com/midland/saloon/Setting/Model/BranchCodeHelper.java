@@ -1,11 +1,18 @@
 package com.midland.saloon.Setting.Model;
 
+import com.midland.saloon.Setting.Repository.RegionRepository;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
 @Component
 public class BranchCodeHelper {
-    private  final Map<String, String> REGION_CODES = Map.ofEntries(
+    /**
+     * The regions this started life with. They are no longer read at runtime -
+     * RegionService copies them into the regions table on first startup and
+     * the lookup goes there instead, so a new region is a form rather than a
+     * deploy. Kept only as that seed.
+     */
+    public static final Map<String, String> SEED_REGION_CODES = Map.ofEntries(
             Map.entry("ARUSHA", "ARU"),
             Map.entry("DAR ES SALAAM", "DAR"),
             Map.entry("DODOMA", "DOD"),
@@ -33,6 +40,12 @@ public class BranchCodeHelper {
             Map.entry("TABORA", "TAB"),
             Map.entry("TANGA", "TAN")
     );
+    private final RegionRepository regionRepository;
+
+    public BranchCodeHelper(RegionRepository regionRepository) {
+        this.regionRepository = regionRepository;
+    }
+
     public String generateRegionCode(String region) {
 
         if (region == null || region.isBlank()) {
@@ -44,8 +57,9 @@ public class BranchCodeHelper {
         String normalizedRegion =
                 region.trim().toUpperCase();
 
-        String code =
-                REGION_CODES.get(normalizedRegion);
+        String code = regionRepository.findByName(normalizedRegion)
+                .map(r -> r.getCode())
+                .orElse(null);
 
         if (code == null) {
             throw new IllegalArgumentException(

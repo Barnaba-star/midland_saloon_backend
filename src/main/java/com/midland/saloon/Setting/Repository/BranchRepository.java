@@ -129,4 +129,7 @@ public interface BranchRepository extends JpaRepository<Branch, String> {
             """)
     List<Branch> findExpiringBranches(@Param("horizon") LocalDate horizon,
                                       @Param("createdBy") String createdBy);
+
+    @Query("SELECT COUNT(b) FROM Branch b WHERE UPPER(b.region) = UPPER(:region)")
+    long countByRegion(@Param("region") String region);
 }
