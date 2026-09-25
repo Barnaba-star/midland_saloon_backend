@@ -5,6 +5,8 @@ import com.midland.saloon.Payment.Dto.PayrollDTO;
 import com.midland.saloon.Payment.Dto.PayrollLineDTO;
 import com.midland.saloon.Payment.Dto.RevenueShareDTO;
 import com.midland.saloon.Payment.Dto.ShareRecipientDTO;
+import com.midland.saloon.Setting.Model.Branch;
+import com.midland.saloon.Setting.Repository.BranchRepository;
 import com.midland.saloon.Uaa.Model.User;
 import com.midland.saloon.Uaa.Repository.UserRepository;
 import com.midland.saloon.Utils.Responses.Response;
@@ -42,6 +44,7 @@ public class PayrollService {
 
     private final RevenueShareService revenueShareService;
     private final UserRepository userRepository;
+    private final BranchRepository branchRepository;
 
     public Response<PayrollDTO> findPayroll(Integer year, Integer month) {
         log.info(LoggerUser.getEmail() + " is accessing the payroll");
@@ -92,6 +95,7 @@ public class PayrollService {
                 .findRevenueShare(period.getYear(), period.getMonthValue()).getData();
 
         PayrollDTO payroll = new PayrollDTO();
+        payroll.setCompanyName(companyName());
         payroll.setYear(period.getYear());
         payroll.setMonth(period.getMonthValue());
         payroll.setGeneratedAt(LocalDateTime.now());
@@ -118,6 +122,19 @@ public class PayrollService {
                 .count());
 
         return new Response<>(payroll);
+    }
+
+    /**
+     * The platform's own branch - the one holding the ROOT code, which is
+     * how the rest of the system already tells it from a customer's.
+     */
+    private String companyName() {
+        try {
+            Branch company = branchRepository.findByBranchCode("ROOT");
+            return company == null ? null : company.getBranchName();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**

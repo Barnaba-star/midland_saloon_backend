@@ -13,6 +13,13 @@ import java.util.List;
 @NoArgsConstructor
 public class PayrollDTO {
 
+    /**
+     * Whose payroll this is - the platform's own branch, the one that
+     * collects the subscriptions and pays these shares out. Printed at the
+     * top, because a sheet handed to a bank has to say who is instructing it.
+     */
+    private String companyName;
+
     private int year;
     private int month;
 
