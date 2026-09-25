@@ -189,7 +189,10 @@ public class Initializer implements ApplicationRunner {
                         // without going through ROOT.
                         "VIEW_ERROR_LOG", "DELETE_ERROR_LOG", "VIEW_AUDIT_LOG",
                         "VIEW_PAYMENTS", "RECONCILE_PAYMENTS",
-                        "SAVE_REGION", "DELETE_REGION"
+                        "SAVE_REGION", "DELETE_REGION",
+                        // Admin: what branches are asking, and what we
+                        // publish back to them.
+                        "VIEW_BRANCH_MESSAGE", "REPLY_BRANCH_MESSAGE", "MANAGE_GUIDANCE"
                 )
         );
         // STAFF registers branches (only ever seeing its own) and sets up
