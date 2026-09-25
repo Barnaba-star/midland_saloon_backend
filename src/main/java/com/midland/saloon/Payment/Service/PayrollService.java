@@ -100,6 +100,7 @@ public class PayrollService {
         payroll.setLines(lines);
         payroll.setRecipients(lines.size());
         payroll.setTotalEarned(lines.stream().mapToLong(PayrollLineDTO::getEarned).sum());
+        payroll.setTotalPaid(lines.stream().mapToLong(PayrollLineDTO::getPaid).sum());
         payroll.setTotalToPay(lines.stream().mapToLong(PayrollLineDTO::getToPay).sum());
         payroll.setSettled((int) lines.stream().filter(line -> line.getToPay() <= 0).count());
         payroll.setMissingPhone((int) lines.stream()
@@ -117,6 +118,20 @@ public class PayrollService {
                 .count());
 
         return new Response<>(payroll);
+    }
+
+    /**
+     * The branch is an eager association, and some rows in this database
+     * point at a branch that no longer exists - there is no foreign key on
+     * the column to have stopped it. Reading it can therefore throw, and a
+     * payroll that will not load is a worse answer than a blank cell.
+     */
+    private static String branchNameOf(User user) {
+        try {
+            return user.getBranch() == null ? null : user.getBranch().getBranchName();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**
@@ -140,6 +155,7 @@ public class PayrollService {
                 line.setAccountNumber(user.getAccountNumber());
                 line.setBankName(user.getBankName());
                 line.setAccountName(user.getAccountName());
+                line.setBranchName(branchNameOf(user));
             }
         }
     }

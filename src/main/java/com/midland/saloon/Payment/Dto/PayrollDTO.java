@@ -32,6 +32,9 @@ public class PayrollDTO {
     /** What the month owes in total, before anything already settled. */
     private long totalEarned;
 
+    /** What has already gone out against this month. */
+    private long totalPaid;
+
     /** What is left to send, once payments already recorded are taken off. */
     private long totalToPay;
 

@@ -21,6 +21,9 @@ public class PayrollLineDTO {
 
     private String phone;
 
+    /** Which branch they belong to, for a sheet covering more than one. */
+    private String branchName;
+
     /** Where the money goes - set by its owner, on their own profile. */
     private String accountNumber;
 
