@@ -80,9 +80,13 @@ public class UserController {
         }
 
         if (Boolean.TRUE.equals(user.getIsBlocked())) {
-            return ResponseEntity
-                    .status(HttpStatus.FORBIDDEN)
-                    .body("Account Blocked");
+            // A code, not a sentence: "Account Blocked" reached the screen in
+            // English and read like a fault rather than a decision somebody
+            // made about this person.
+            Map<String, Object> blocked = new LinkedHashMap<>();
+            blocked.put("status", 403);
+            blocked.put("code", "ACCOUNT_BLOCKED");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(blocked);
         }
 
         // The right code, but too late - or already spent on wrong guesses.

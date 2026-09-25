@@ -399,16 +399,56 @@ public class UserService {
                 || roleCodes.contains("DIRECTOR");
     }
 
-    public Response<User> enableOrDisableAccount(String userUID, Boolean enable){
-        log.info(LoggerUser.getEmail() + "is Enabling or Disabling User Account");
-        if(userUID == null || enable == null)
-            return new Response<>("Either User Ref UID or Enable Value must be provided");
+    /**
+     * Takes somebody's way into the system away, or gives it back.
+     *
+     * Not a delete. A person's uid is what branches.created_by, the
+     * commission payouts and the subscription payments all point at - which
+     * is to say it is what the STAFF commission report is built from.
+     * Removing the row would orphan every one of those and quietly change
+     * what people are owed. Blocking stops the login and leaves the history
+     * standing, which is what "they no longer work here" actually means.
+     *
+     * The parameter used to be called `enable` while setting isBlocked, so
+     * true meant the opposite of what it read as. It says what it does now.
+     */
+    public Response<String> setAccountBlocked(String userUID, Boolean blocked){
+        log.info(LoggerUser.getEmail() + " is changing account access");
+        if (userUID == null || blocked == null) {
+            return blockCode("MISSING_DATA");
+        }
+
+        // Blocking yourself locks you out of the screen you did it from, and
+        // possibly out of the only account that could undo it.
+        if (userUID.equals(LoggerUser.getUser().getUid())) {
+            return blockCode("NOT_YOURSELF");
+        }
+
         Optional<User> optionalUser = userRepository.findById(userUID);
-        if(optionalUser.isEmpty())
-            return new Response<>("User Not Found");
+        if (optionalUser.isEmpty()) {
+            return blockCode("NOT_FOUND");
+        }
+
         User user = optionalUser.get();
-        user.setIsBlocked(enable);
-        return new Response<>(userRepository.save(user));
+
+        // The platform's own root account is how everything is put right when
+        // something goes wrong; it is not something to switch off from a
+        // branch screen.
+        if (Boolean.TRUE.equals(blocked) && Boolean.TRUE.equals(user.getIsRoot())) {
+            return blockCode("NOT_ROOT");
+        }
+
+        user.setIsBlocked(blocked);
+        userRepository.save(user);
+        return blockCode(blocked ? "BLOCKED" : "RESTORED");
+    }
+
+    /** See the note on data() - Response<String> needs it said explicitly. */
+    private static Response<String> blockCode(String value) {
+        Response<String> response = new Response<>();
+        response.setData(value);
+        response.setStatus(com.midland.saloon.Utils.Responses.ResponseStatus.SUCCESS);
+        return response;
     }
     public Response<User> changePassword(DataDTO dataDTO) {
         log.info(LoggerUser.getEmail() + " is Changing Password");

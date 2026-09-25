@@ -60,10 +60,15 @@ public class SaloonController {
     public ResponsePage<User> findUserPageByBranch(@RequestBody PageableParam pageableParam){
         return saloonService.findUserPageByBranch(pageableParam.getPage(), pageableParam.getSize());
     }
+    /**
+     * The POS side of revoking a branch user's access. Same rule as the
+     * settings one - blocked, not deleted, because their uid is what the
+     * commission report and every payment record point at.
+     */
     @PreAuthorize("@authChecker.hasPermissionOrRoot('ENABLE_OR_DISABLE_USER')")
-    @PostMapping("/enableOrDisableUser/{userUID}/{enable}")
-    public Response<User> enableOrDisableUser(@PathVariable String userUID, @PathVariable Boolean enable){
-        return userService.enableOrDisableAccount(userUID, enable);
+    @PostMapping("/setUserBlocked/{userUID}/{blocked}")
+    public Response<String> setUserBlocked(@PathVariable String userUID, @PathVariable Boolean blocked){
+        return userService.setAccountBlocked(userUID, blocked);
     }
     @PreAuthorize("@authChecker.hasPermissionOrRoot('ASSIGN_USER_ROLE')")
     @PostMapping("/assignOrUnAssignUserRoleByBranch")

@@ -54,10 +54,15 @@ public class UserSettingController {
         return userService.assignOrUnAssignUserRole(assignUserRoleDTO);
     }
 
+    /**
+     * Revokes somebody's access, or gives it back. The path says `blocked`
+     * because that is the column it sets - the old name said `enable` and
+     * meant the opposite.
+     */
     @PreAuthorize("@authChecker.hasPermissionOrRoot('ENABLE_OR_DISABLE_ACCOUNT')")
-    @PostMapping("/enableOrDisableAccount/{userUID}/{enable}")
-    public Response<User> enableOrDisableAccount(@PathVariable String userUID, @PathVariable Boolean enable){
-        return userService.enableOrDisableAccount(userUID, enable);
+    @PostMapping("/setAccountBlocked/{userUID}/{blocked}")
+    public Response<String> setAccountBlocked(@PathVariable String userUID, @PathVariable Boolean blocked){
+        return userService.setAccountBlocked(userUID, blocked);
     }
 
     /**
