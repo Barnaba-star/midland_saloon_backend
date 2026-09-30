@@ -183,6 +183,13 @@ public class SaloonController {
         return saloonService.salesOpenedList();
     }
 
+    /** An empty bill opened by mistake - whoever may open a bill may take an empty one away. */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_SALES')")
+    @PostMapping("/deleteEmptyBill/{billUid}")
+    public Response<SalesOpened> deleteEmptyBill(@PathVariable String billUid){
+        return saloonService.deleteEmptyBill(billUid);
+    }
+
     @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_SALES')")
     @PostMapping("/saveOpenSale")
     public Response<SalesOpened> saveOpenSale(@RequestBody SaleOpenedDTO saleOpenedDTO){

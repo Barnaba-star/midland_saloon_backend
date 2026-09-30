@@ -18,6 +18,10 @@ public interface SaloonSalesRepository extends JpaRepository<SaloonSales, String
     @Query("SELECT s FROM SaloonSales s WHERE s.uid=:uid AND s.branchUid=:branchUID")
     Optional<SaloonSales> findSalesByUID(String uid, String branchUID);
 
+    /** How many live lines a bill has - an empty bill has none, whatever they cost. */
+    @Query("SELECT COUNT(s) FROM SaloonSales s WHERE s.salesOpened.uid = :billUid AND s.isActive = true")
+    long countLines(@org.springframework.data.repository.query.Param("billUid") String billUid);
+
     @Query("""
             SELECT s.uid as uid,  s.createdAt as salesTime, so.paymentMethod as paymentName,
             so.salesCode as salesCode, so.status as status,

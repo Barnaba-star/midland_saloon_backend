@@ -130,6 +130,8 @@ public class Initializer implements ApplicationRunner {
                         "DELETE_SALOON_USER", "ASSIGN_USER_ROLE", "ENABLE_OR_DISABLE_ACCOUNT",
                         "VIEW_ROLE",
                         "VIEW_BRANCH",
+                        // Changes the branch logo (ROOT could before; the owner can now too).
+                        "MANAGE_SYSTEM_SETTINGS",
                         "SAVE_COMMISSION", "VIEW_COMMISSION", "DELETE_COMMISSION",
                         "VIEW_TABLE_SIZE",
                         "SAVE_SERVICE", "VIEW_SERVICE", "DELETE_SERVICE",

@@ -514,6 +514,25 @@ public class SaloonService {
             return new Response<>("Error in deleting sales");
         }
     }
+    /**
+     * Removes a bill opened by mistake - only while nothing is on it, so no sale or
+     * money goes with it. Cancelled and soft-deleted rather than erased.
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public Response<SalesOpened> deleteEmptyBill(String billUid) {
+        SalesOpened bill = salesOpenedRepository.findById(billUid)
+                .filter(b -> LoggerUser.getBranchUID() != null && LoggerUser.getBranchUID().equals(b.getBranchUid()))
+                .filter(b -> b.getIsActive() == null || b.getIsActive())
+                .orElse(null);
+        if (bill == null || !"PENDING".equals(bill.getPaymentStatus()))
+            return new Response<>("That bill is not open any more");
+        if (saloonSalesRepository.countLines(billUid) > 0 || (bill.getBill() != null && bill.getBill() > 0))
+            return new Response<>("Only an empty bill can be deleted - bill " + bill.getSalesCode() + " has services on it");
+        bill.setPaymentStatus("CANCELLED");
+        bill.delete();
+        return new Response<>(salesOpenedRepository.save(bill));
+    }
+
     public Response<SalesOpened> saveOpenSale(SaleOpenedDTO saleOpenedDTO) {
         log.info(LoggerUser.getEmail() + " is Opening Sale");
         if (saleOpenedDTO == null) {

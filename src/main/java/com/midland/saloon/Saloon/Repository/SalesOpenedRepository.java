@@ -19,6 +19,7 @@ public interface SalesOpenedRepository extends JpaRepository<SalesOpened, String
     WHERE s.branchUid = :branchUID
       AND s.createdAt >= :startDate
       AND s.createdAt < :endDate
+      AND (s.isActive IS NULL OR s.isActive = true)
 """)
     List<SalesOpened> salesOpenedListByStatus(
             @Param("branchUID") String branchUID,

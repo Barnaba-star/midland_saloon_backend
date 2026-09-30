@@ -69,6 +69,15 @@ public class JwtTokenUtil {
                 .compact();
     }
 
+    public String extractBranchUID(String token){
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(PRIVATE_KEY)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        return claims.get("branchUID", String.class);
+    }
+
     public String extractUsername(String token){
         Claims claims = Jwts.parserBuilder()
                 .setSigningKey(PRIVATE_KEY)
