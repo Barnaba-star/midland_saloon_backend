@@ -4,7 +4,6 @@ import com.midland.saloon.Config.Security.LoggerUser;
 import com.midland.saloon.Notification.Model.Notification;
 import com.midland.saloon.Notification.Repository.NotificationRepository;
 import com.midland.saloon.Saloon.Model.SalesOpened;
-import com.midland.saloon.Uaa.Model.User;
 import com.midland.saloon.Uaa.Repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -49,15 +48,20 @@ public class NotificationService {
         notification.setIcon(icon);
         notification.setRoute(route);
 
+        notification.setParamsJson(paramsJson(params));
+
+        notificationRepository.save(notification);
+    }
+
+    private String paramsJson(Map<String, Object> params) {
         if (params != null && !params.isEmpty()) {
             try {
-                notification.setParamsJson(objectMapper.writeValueAsString(params));
+                return objectMapper.writeValueAsString(params);
             } catch (Exception e) {
                 log.warn("Could not serialize notification params", e);
             }
         }
-
-        notificationRepository.save(notification);
+        return null;
     }
 
     /**
@@ -71,22 +75,33 @@ public class NotificationService {
             return;
         }
 
-        List<User> branchUsers = userRepository.findAllUsersWithBranchAndRoles(sale.getBranchUid());
+        // Only the ids are needed. This runs every time a bill is paid, and
+        // loading the whole users (roles, permissions, branches) to read
+        // their uid - then saving each notification in its own transaction -
+        // was most of what marking a bill paid cost.
+        List<String> userUids = userRepository.findUidsByBranch(sale.getBranchUid());
 
         Map<String, Object> params = new HashMap<>();
         params.put("code", sale.getSalesCode());
         params.put("amount", sale.getPaidAmount());
+        String paramsJson = paramsJson(params);
 
-        for (User user : branchUsers) {
-            notify(
-                    user.getUid(),
-                    "NOTIFICATIONS.NEW_SALE_TITLE",
-                    "NOTIFICATIONS.NEW_SALE_MESSAGE",
-                    params,
-                    "point_of_sale",
-                    "/pos/saloonSales"
-            );
+        List<Notification> notifications = new java.util.ArrayList<>();
+        for (String userUid : userUids) {
+            if (userUid == null) {
+                continue;
+            }
+            Notification notification = new Notification();
+            notification.setTargetUserUID(userUid);
+            notification.setTitleKey("NOTIFICATIONS.NEW_SALE_TITLE");
+            notification.setMessageKey("NOTIFICATIONS.NEW_SALE_MESSAGE");
+            notification.setIcon("point_of_sale");
+            notification.setRoute("/pos/saloonSales");
+            notification.setParamsJson(paramsJson);
+            notifications.add(notification);
         }
+        // One transaction, inserts batched.
+        notificationRepository.saveAll(notifications);
     }
 
     public List<Notification> findMyNotifications() {

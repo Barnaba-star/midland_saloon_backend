@@ -78,6 +78,10 @@ public interface UserRepository extends JpaRepository<User, String> {
 """)
     List<User> findAllUsersWithBranchAndRoles(@Param("branchUID")String branchUID);
 
+    /** Just the ids of a branch's users - the same people as above, without loading them. */
+    @Query("SELECT u.uid FROM User u WHERE u.branch.uid = :branchUID")
+    List<String> findUidsByBranch(@Param("branchUID") String branchUID);
+
     @Query("""
     SELECT
         u.uid AS uid,
