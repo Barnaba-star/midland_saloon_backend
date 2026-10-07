@@ -76,7 +76,7 @@ public class SnippeClient {
             // them comes back as a validation error rather than a payment, so
             // none of them is passed through unchecked.
             Map<String, Object> customer = new LinkedHashMap<>();
-            customer.put("firstname", orFallback(firstName, "Midland"));
+            customer.put("firstname", orFallback(firstName, "Mr Saloon"));
             customer.put("lastname", orFallback(lastName, "Subscription"));
             customer.put("email", billingEmail);
 

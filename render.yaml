@@ -1,4 +1,4 @@
-# Midland Saloon on Render - the whole thing from one Blueprint:
+# Mr Saloon (Midland Saloon) on Render - the whole thing from one Blueprint:
 # Postgres, the Spring Boot backend (this repo) and the Angular frontend
 # (midland_saloon_frontend). All free-plan for now (trial): the services
 # sleep after 15 idle minutes, the free database expires after 30 days

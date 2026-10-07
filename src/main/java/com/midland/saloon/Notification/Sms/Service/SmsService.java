@@ -36,7 +36,7 @@ public class SmsService {
     @Value("${sms.enabled:false}")
     private boolean enabled;
 
-    @Value("${sms.app-name:Midland}")
+    @Value("${sms.app-name:Mr Saloon}")
     private String appName;
 
     private final SmsClient smsClient;

@@ -291,7 +291,7 @@ public class Initializer implements ApplicationRunner {
         Branch existingRoot = branchRepository.findByBranchCode(ROOT_BRANCH_CODE);
         if(existingRoot == null){
             Branch branch = new Branch();
-            branch.setBranchName("MIDLAND SOLUTIONS");
+            branch.setBranchName("MR SALOON");
             branch.setBranchCategory("ALL CATEGORIES");
             branch.setBranchCode(ROOT_BRANCH_CODE);
             branch.setRegion("DODOMA");
