@@ -38,4 +38,11 @@ public interface SalesOpenedRepository extends JpaRepository<SalesOpened, String
             WHERE s.branchUid = :branchUID AND s.paymentStatus = 'PENDING'
             """)
     long pendingBillsAmount(@Param("branchUID") String branchUID);
+
+    /** One cashier's takings in [from, to): method, amount, bills - what their cash-up expects. */
+    @Query("SELECT LOWER(s.paymentMethod), COALESCE(SUM(s.paidAmount), 0), COUNT(s) FROM SalesOpened s " +
+           "WHERE s.branchUid = :branchUID AND s.paidBy = :email AND s.isActive = true AND s.paymentStatus = 'PAID' " +
+           "AND s.paidAt >= :from AND s.paidAt < :to GROUP BY LOWER(s.paymentMethod)")
+    List<Object[]> takingsOf(@Param("branchUID") String branchUID, @Param("email") String email,
+                             @Param("from") java.time.LocalDateTime from, @Param("to") java.time.LocalDateTime to);
 }

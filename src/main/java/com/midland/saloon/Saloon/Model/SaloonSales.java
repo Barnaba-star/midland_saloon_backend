@@ -44,4 +44,8 @@ public class SaloonSales extends TenantEntity {
 
     @Column(name = "status")
     private String status = "ACTIVE";
+
+    /** When the line was put on the bill, to the second - what the peak-hours report reads. */
+    @Column(name = "sold_at")
+    private java.time.LocalDateTime soldAt;
 }

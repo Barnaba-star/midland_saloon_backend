@@ -40,7 +40,17 @@ import java.util.Objects;
 @Log
 @RequiredArgsConstructor
 public class SaloonService {
+
+  /** The payment methods a payout may go by - the same as a bill's. */
+  private static final java.util.Set<String> PAYOUT_METHODS = java.util.Set.of("cash", "mpesa", "tigopesa", "airtelmoney", "halopesa", "bank");
+
+  /** A payout's method, lower-case; cash when none (or an unknown one) was given. */
+  private static String payoutMethod(String method) {
+      String m = method == null ? "" : method.trim().toLowerCase();
+      return PAYOUT_METHODS.contains(m) ? m : "cash";
+  }
   private final SaloonServiceRepository saloonServiceRepository;
+  private final OtherCommissionService otherCommissionService;
   private final UserRepository userRepository;
   private final CommissionRepository commissionRepository;
   private final SaloonStaffRepository saloonStaffRepository;
@@ -357,6 +367,7 @@ public class SaloonService {
             staffBill.add(commission.getStaffPercent()* (service.getPrice()/100));
             bills.add(service.getPrice());
             SaloonSales sale = new SaloonSales();
+            sale.setSoldAt(java.time.LocalDateTime.now());
             sale.setSaloonStaff(staff);
             sale.setSaloonServiceEntity(service);
             sale.setSalesOpened(salesOpened);
@@ -561,6 +572,12 @@ public class SaloonService {
             salesOpened.setSalesCode(saleOpenedDTO.getSalesCode());
         if(saleOpenedDTO.getStatus() != null)
             salesOpened.setStatus(saleOpenedDTO.getStatus());
+
+        // Who took the money and when - a cash-up counts it in that cashier's takings.
+        if (!wasAlreadyPaid && "PAID".equals(salesOpened.getPaymentStatus())) {
+            salesOpened.setPaidBy(LoggerUser.getEmail());
+            salesOpened.setPaidAt(java.time.LocalDateTime.now());
+        }
 
         try {
             SalesOpened savedSale = salesOpenedRepository.save(salesOpened);
@@ -823,14 +840,7 @@ public class SaloonService {
              * OTHER
              * =========================
              */
-            addIncomeExpense(
-                    "Other",
-                    amount,
-                    commission.getOtherPercent(),
-                    branchUID,
-                    weekStartDate,
-                    result
-            );
+            addOtherIncome(amount, commission.getOtherPercent(), branchUID, weekStartDate, result, today);
 
             /*
              * =========================
@@ -908,6 +918,26 @@ public class SaloonService {
         );
     }
 
+
+    /**
+     * The Other bucket. With the branch's own list set (POS Setting > Other),
+     * its amount is shared across those items, each into a pot of its own;
+     * without one it stays the single "Other" pot it always was.
+     */
+    private void addOtherIncome(BigDecimal amount, Integer percent, String branchUID, LocalDate weekStartDate, List<IncomeExpenses> result, LocalDate day) {
+        if (percent == null || percent <= 0) {
+            return;
+        }
+        BigDecimal other = amount.multiply(BigDecimal.valueOf(percent)).divide(BigDecimal.valueOf(100));
+        java.util.Map<String, BigDecimal> parts = otherCommissionService.split(other, branchUID);
+        if (parts.isEmpty()) {
+            addIncomeExpense("Other", amount, percent, branchUID, weekStartDate, result);
+            return;
+        }
+        // Each share is already in shillings - taken at 100% it lands as it is.
+        parts.forEach((pot, share) -> addIncomeExpense(pot, share, 100, branchUID, weekStartDate, result));
+        otherCommissionService.record(parts, day);
+    }
 
     private void addIncomeExpense(String name, BigDecimal amount, Integer percent, String branchUID, LocalDate weekStartDate, List<IncomeExpenses> result) {
 
@@ -1188,15 +1218,19 @@ public class SaloonService {
             return new Response<>("Provide Spend Description");
         }
 
+        if (spendDTO.getMethod() != null && !spendDTO.getMethod().isBlank() && !PAYOUT_METHODS.contains(spendDTO.getMethod().trim().toLowerCase())) {
+            return new Response<>("Choose how it was paid");
+        }
+
 
         // ==============================
         // FIND INCOME EXPENSE
         // ==============================
 
+        // Only a pot of the user's own branch - a uid from another branch is not found.
         Optional<IncomeExpenses> optionalIncomeExpenses =
-                incomeExpensesRepository.findById(
-                        spendDTO.getUid()
-                );
+                incomeExpensesRepository.findById(spendDTO.getUid())
+                        .filter(pot -> java.util.Objects.equals(pot.getBranchUid(), LoggerUser.getBranchUID()));
 
         if (optionalIncomeExpenses.isEmpty()) {
             return new Response<>("Income Expenses Not Found");
@@ -1250,6 +1284,9 @@ public class SaloonService {
 
         IncomeExpensesDescription spend =
                 new IncomeExpensesDescription();
+        spend.setPaidBy(LoggerUser.getEmail());
+        spend.setPaidAt(java.time.LocalDateTime.now());
+        spend.setMethod(payoutMethod(spendDTO.getMethod()));
 
         spend.setDescription(
                 spendDTO.getDescription().trim()
@@ -1262,6 +1299,14 @@ public class SaloonService {
         spend.setSpendAmount(
                 spendAmount
         );
+
+        // Who recorded the payment, for the spending history.
+        com.midland.saloon.Uaa.Model.User payer = LoggerUser.getUser();
+        if (payer != null) {
+            String fullName = ((payer.getFirstName() == null ? "" : payer.getFirstName()) + " "
+                    + (payer.getLastName() == null ? "" : payer.getLastName())).trim();
+            spend.setStaffName(fullName.isEmpty() ? payer.getUsername() : fullName);
+        }
 
         spend.setIncomeExpenses(
                 incomeExpenses
@@ -2119,6 +2164,9 @@ public class SaloonService {
         for (int i = 0; i < incomeExpenses.size(); i++) {
             IncomeExpenses expenses = incomeExpenses.get(i);
             IncomeExpensesDescription incomeExpensesDescription = new IncomeExpensesDescription();
+            incomeExpensesDescription.setPaidBy(LoggerUser.getEmail());
+            incomeExpensesDescription.setPaidAt(java.time.LocalDateTime.now());
+            incomeExpensesDescription.setMethod(payoutMethod(staffCommissionDTO.getMethod()));
             expenses.setDescriptions("Staff Commission");
             BigDecimal amountPerExpense = baseAmount;
             if (i == incomeExpenses.size() - 1) {
@@ -2881,6 +2929,9 @@ public class SaloonService {
         // ==============================
 
         IncomeExpensesDescription incomeExpensesDescription=new IncomeExpensesDescription();
+        incomeExpensesDescription.setPaidBy(LoggerUser.getEmail());
+        incomeExpensesDescription.setPaidAt(java.time.LocalDateTime.now());
+        incomeExpensesDescription.setMethod(payoutMethod(dto.getMethod()));
 
         log.info(" Stock And Purchase NAME  :" + savedStock.getSaloonService().getServiceName());
 

@@ -132,6 +132,8 @@ public class Initializer implements ApplicationRunner {
                         "VIEW_BRANCH",
                         // Changes the branch logo (ROOT could before; the owner can now too).
                         "MANAGE_SYSTEM_SETTINGS",
+                        // Decides what the Other commission pays for (POS Setting > Other).
+                        "MANAGE_OTHER_COMMISSION",
                         "SAVE_COMMISSION", "VIEW_COMMISSION", "DELETE_COMMISSION",
                         "VIEW_TABLE_SIZE",
                         "SAVE_SERVICE", "VIEW_SERVICE", "DELETE_SERVICE",

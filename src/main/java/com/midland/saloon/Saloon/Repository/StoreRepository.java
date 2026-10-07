@@ -55,4 +55,14 @@ public interface StoreRepository  extends JpaRepository<Store, String> {
 
     @Query("SELECT COUNT(s) FROM Store s WHERE s.branchUid = :branchUID")
     long countStores(@Param("branchUID") String branchUID);
+
+    /** Every active store item of the branch - what a stock take goes through. */
+    @org.springframework.data.jpa.repository.Query("SELECT s FROM Store s WHERE s.branchUid = :branchUID AND s.isActive = true ORDER BY s.nameOfStore")
+    java.util.List<Store> findCountable(@org.springframework.data.repository.query.Param("branchUID") String branchUID);
+
+    /** One store item, locked for the rest of the transaction. */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("SELECT s FROM Store s WHERE s.uid = :uid AND s.branchUid = :branchUID")
+    java.util.Optional<Store> findForUpdate(@org.springframework.data.repository.query.Param("uid") String uid,
+                                            @org.springframework.data.repository.query.Param("branchUID") String branchUID);
 }

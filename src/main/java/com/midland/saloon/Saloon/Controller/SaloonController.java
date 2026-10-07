@@ -25,6 +25,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SaloonController {
     private final SaloonService saloonService;
+    private final com.midland.saloon.Saloon.Service.InsightService insightService;
+    private final com.midland.saloon.Saloon.Service.CashUpService cashUpService;
+    private final com.midland.saloon.Saloon.Service.StockTakeService stockTakeService;
+    private final com.midland.saloon.Saloon.Service.OtherCommissionService otherCommissionService;
     private final UserService userService;
 
     /***
@@ -360,5 +364,109 @@ public class SaloonController {
     @GetMapping("/findStaffEarnings")
     public ResponseList<StaffEarningsProjection> findStaffEarnings() {
         return saloonService.findStaffEarnings();
+    }
+
+    /** What the branch's Other commission pays for - the CEO's list. */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('MANAGE_OTHER_COMMISSION')")
+    @GetMapping("/otherCommissionItems")
+    public ResponseList<com.midland.saloon.Saloon.Model.OtherCommissionItem> otherCommissionItems(){
+        return otherCommissionService.findItems();
+    }
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('MANAGE_OTHER_COMMISSION')")
+    @PostMapping("/saveOtherCommissionItems")
+    public ResponseList<com.midland.saloon.Saloon.Model.OtherCommissionItem> saveOtherCommissionItems(@RequestBody java.util.List<com.midland.saloon.Saloon.Dto.OtherCommissionItemDTO> items){
+        return otherCommissionService.saveItems(items);
+    }
+
+    /** How the Other commission was split over a period - the table under Other in Reports. */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_REPORT')")
+    @GetMapping("/otherSplitReport/{filter}")
+    public Response<java.util.Map<String, Object>> otherSplitReport(@PathVariable String filter){
+        return otherCommissionService.report(filter);
+    }
+
+    /*
+     CASH-UP - closing a shift. Whoever marks bills paid (SAVE_SALES) closes their
+     own; the list follows VIEW_REPORT, narrowed to a cashier's own unless a manager.
+     */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_SALES')")
+    @GetMapping("/cashUp/preview")
+    public Response<java.util.Map<String, Object>> cashUpPreview(){
+        return cashUpService.preview();
+    }
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_SALES')")
+    @PostMapping("/cashUp/submit")
+    public Response<com.midland.saloon.Saloon.Model.CashUp> cashUpSubmit(@RequestBody com.midland.saloon.Saloon.Dto.CashUpDTO dto){
+        return cashUpService.submit(dto);
+    }
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_REPORT')")
+    @GetMapping("/cashUp/list/{filter}")
+    public ResponseList<com.midland.saloon.Saloon.Model.CashUp> cashUps(@PathVariable String filter){
+        return cashUpService.findClosed(filter);
+    }
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_REPORT')")
+    @GetMapping("/cashUp/{uid}/lines")
+    public ResponseList<com.midland.saloon.Saloon.Model.CashUpLine> cashUpLines(@PathVariable String uid){
+        return cashUpService.findLines(uid);
+    }
+
+    /*
+     STOCK TAKE - counting the store's unopened items at once (SAVE_STORE);
+     its history and the variance by item follow VIEW_STORE.
+     */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_STORE')")
+    @GetMapping("/stockTake/items")
+    public ResponseList<java.util.Map<String, Object>> stockTakeItems(){
+        return stockTakeService.countable();
+    }
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_STORE')")
+    @PostMapping("/stockTake/submit")
+    public Response<com.midland.saloon.Saloon.Model.StockTake> stockTakeSubmit(@RequestBody com.midland.saloon.Saloon.Dto.StockTakeDTO dto){
+        return stockTakeService.submit(dto);
+    }
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_STORE')")
+    @GetMapping("/stockTake/list/{filter}")
+    public ResponseList<com.midland.saloon.Saloon.Model.StockTake> stockTakes(@PathVariable String filter){
+        return stockTakeService.findTaken(filter);
+    }
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_STORE')")
+    @GetMapping("/stockTake/{uid}/lines")
+    public ResponseList<com.midland.saloon.Saloon.Model.StockTakeLine> stockTakeLines(@PathVariable String uid){
+        return stockTakeService.findLines(uid);
+    }
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_STORE')")
+    @GetMapping("/stockTake/variance/{filter}")
+    public ResponseList<java.util.Map<String, Object>> stockVariance(@PathVariable String filter){
+        return stockTakeService.varianceByProduct(filter);
+    }
+
+    /*
+     INSIGHTS - sales per service, best sellers, idle store items, peak hours,
+     and every pot's balance since the start. Report readers (VIEW_REPORT).
+     */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_REPORT')")
+    @GetMapping("/insights/products/{filter}")
+    public Response<java.util.Map<String, Object>> insightProducts(@PathVariable String filter){
+        return insightService.products(filter);
+    }
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_REPORT')")
+    @GetMapping("/insights/peak/{filter}")
+    public Response<java.util.Map<String, Object>> insightPeak(@PathVariable String filter){
+        return insightService.peakHours(filter);
+    }
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_REPORT')")
+    @GetMapping("/insights/ledger")
+    public Response<java.util.Map<String, Object>> insightLedger(){
+        return insightService.potsLedger();
     }
 }

@@ -39,4 +39,12 @@ public class SalesOpened extends TenantEntity {
 
     @Column(name = "bill")
     private Integer bill=0;
+
+    /** The login that marked the bill paid - a cash-up counts it in that cashier's takings. */
+    @Column(name = "paid_by")
+    private String paidBy;
+
+    /** When it was marked paid, to the second. */
+    @Column(name = "paid_at")
+    private java.time.LocalDateTime paidAt;
 }
