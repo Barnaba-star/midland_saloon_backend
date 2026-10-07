@@ -32,6 +32,11 @@ public class WebSecurityConfiguration {
         return new BCryptPasswordEncoder();
     }
 
+    /** app.cors.allowed-origin: the frontend's address(es), comma-separated -
+     *  localhost in development, the Railway / own domain in production. */
+    @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origin:http://localhost:4200}")
+    private String allowedOrigin;
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration corsConfiguration = new CorsConfiguration();
@@ -39,7 +44,8 @@ public class WebSecurityConfiguration {
         corsConfiguration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         corsConfiguration.setAllowCredentials(true);
         corsConfiguration.setExposedHeaders(List.of("Authorization"));
-        corsConfiguration.setAllowedOrigins(List.of("http://localhost:4200"));
+        corsConfiguration.setAllowedOrigins(java.util.Arrays.stream(allowedOrigin.split(","))
+                .map(String::trim).filter(o -> !o.isEmpty()).toList());
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", corsConfiguration);
         return source;
