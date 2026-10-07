@@ -4,6 +4,7 @@ import com.midland.saloon.Setting.Model.Role;
 import com.midland.saloon.Uaa.Model.Permission;
 import com.midland.saloon.Uaa.Model.User;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import com.midland.saloon.Setting.Service.PlatformSettingService;
@@ -42,6 +43,28 @@ public class JwtTokenUtil {
         byte[] digest = java.security.MessageDigest.getInstance("SHA-512")
                 .digest(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         PRIVATE_KEY = java.util.Base64.getEncoder().encodeToString(digest);
+    }
+
+    /**
+     * Built once: a parser decodes the key and sets itself up on creation,
+     * and every authenticated request used to build six of them - one per
+     * claim read - each verifying the signature and parsing the JSON again.
+     * JwtParser is immutable and safe to share between threads.
+     */
+    private volatile JwtParser parser;
+
+    private JwtParser parser() {
+        JwtParser p = parser;
+        if (p == null) {
+            p = Jwts.parserBuilder().setSigningKey(PRIVATE_KEY).build();
+            parser = p;
+        }
+        return p;
+    }
+
+    /** Verifies the token and returns its claims; throws as parsing always did when it is bad or expired. */
+    public Claims parseClaims(String token) {
+        return parser().parseClaimsJws(token).getBody();
     }
 
     private final PlatformSettingService platformSettingService;
@@ -95,38 +118,22 @@ public class JwtTokenUtil {
     }
 
     public String extractBranchUID(String token){
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(PRIVATE_KEY)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+        Claims claims = parseClaims(token);
         return claims.get("branchUID", String.class);
     }
 
     public String extractUsername(String token){
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(PRIVATE_KEY)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+        Claims claims = parseClaims(token);
         return claims.getSubject();
     }
 
     public Boolean isTokenExpired(String token){
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(PRIVATE_KEY)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+        Claims claims = parseClaims(token);
         return claims.getExpiration().before(new Date());
     }
 
     public Boolean isRoot(String token){
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(PRIVATE_KEY)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+        Claims claims = parseClaims(token);
        // return claims.get("isRoot", Boolean.class);
         Boolean isRoot = claims.get("isRoot", Boolean.class);
         return Boolean.TRUE.equals(isRoot);
@@ -134,42 +141,53 @@ public class JwtTokenUtil {
     }
 
     public Boolean mustChangePassword(String token){
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(PRIVATE_KEY)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+        Claims claims = parseClaims(token);
         // Absent on tokens issued before this claim existed, which is the
         // same as "no, they don't".
         return Boolean.TRUE.equals(claims.get("mustChangePassword", Boolean.class));
     }
 
     public List<SimpleGrantedAuthority> extractRoles(String token){
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(PRIVATE_KEY)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+        Claims claims = parseClaims(token);
         List<String> roles = claims.get("roles", List.class);
         return roles.stream().map(SimpleGrantedAuthority::new).toList();
     }
 
     public List<SimpleGrantedAuthority> extractPermission(String token){
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(PRIVATE_KEY)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+        Claims claims = parseClaims(token);
         List<String> permissions =  claims.get("permissions", List.class);
         return permissions.stream().map(SimpleGrantedAuthority::new).toList();
     }
 
+    // The same reads off claims already verified once by parseClaims - what
+    // the authentication filter uses, so a request parses its token once.
+
+    public static String branchUID(Claims claims) {
+        return claims.get("branchUID", String.class);
+    }
+
+    public static boolean isRoot(Claims claims) {
+        return Boolean.TRUE.equals(claims.get("isRoot", Boolean.class));
+    }
+
+    public static boolean mustChangePassword(Claims claims) {
+        return Boolean.TRUE.equals(claims.get("mustChangePassword", Boolean.class));
+    }
+
+    @SuppressWarnings("unchecked")
+    public static List<SimpleGrantedAuthority> roles(Claims claims) {
+        List<String> roles = claims.get("roles", List.class);
+        return roles.stream().map(SimpleGrantedAuthority::new).toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    public static List<SimpleGrantedAuthority> permissions(Claims claims) {
+        List<String> permissions = claims.get("permissions", List.class);
+        return permissions.stream().map(SimpleGrantedAuthority::new).toList();
+    }
+
     public List<SimpleGrantedAuthority> extractActions(String token){
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(PRIVATE_KEY)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+        Claims claims = parseClaims(token);
         List<String> actions = claims.get("actions", List.class);
         return actions.stream().map(SimpleGrantedAuthority::new).toList();
     }

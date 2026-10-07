@@ -2,6 +2,7 @@ package com.midland.saloon.Config.Security;
 
 import com.midland.saloon.Uaa.Model.User;
 import com.midland.saloon.Uaa.Repository.UserRepository;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
@@ -44,13 +45,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
-        String username = jwtTokenUtil.extractUsername(token);
-       // Boolean isRoot = jwtTokenUtil.isRoot(token);
-        boolean isRoot = Boolean.TRUE.equals(jwtTokenUtil.isRoot(token));
+        // Verified and parsed once; every claim below is read off this.
+        Claims claims = jwtTokenUtil.parseClaims(token);
+        String username = claims.getSubject();
+        boolean isRoot = JwtTokenUtil.isRoot(claims);
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             User user = userRepository.findByUsernameForAuthentication(username);
             // The branch chosen at login - honoured only while it is still one of theirs.
-            String branchUID = jwtTokenUtil.extractBranchUID(token);
+            String branchUID = JwtTokenUtil.branchUID(claims);
             if (user != null && branchUID != null && user.getHomeBranch() != null
                     && !branchUID.equals(user.getHomeBranch().getUid())) {
                 user.getWorkBranches().stream()
@@ -62,8 +64,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (isRoot) {
                 authorities = List.of(new SimpleGrantedAuthority("ROOT"));
             } else {
-                List<SimpleGrantedAuthority> roles = jwtTokenUtil.extractRoles(token);
-                List<SimpleGrantedAuthority> permissions = jwtTokenUtil.extractPermission(token);
+                List<SimpleGrantedAuthority> roles = JwtTokenUtil.roles(claims);
+                List<SimpleGrantedAuthority> permissions = JwtTokenUtil.permissions(claims);
                 authorities = mergeAuthorities(roles, permissions);
             }
 
@@ -76,7 +78,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // An account still on its texted password holds a token that opens
         // one door only. Hiding the rest in the UI is not enough - the token
         // is a bearer credential, and whoever read that SMS has it too.
-        if (jwtTokenUtil.mustChangePassword(token) && !isPasswordChangePath(request)) {
+        if (JwtTokenUtil.mustChangePassword(claims) && !isPasswordChangePath(request)) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             response.setContentType("application/json");
             response.setCharacterEncoding("UTF-8");
