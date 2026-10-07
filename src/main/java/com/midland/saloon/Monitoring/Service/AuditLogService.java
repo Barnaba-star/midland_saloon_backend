@@ -44,6 +44,7 @@ public class AuditLogService {
         Map<String, String> actions = new LinkedHashMap<>();
         actions.put("/branch/saveBranch", "Saved a branch");
         actions.put("/branch/deleteBranch", "Deleted a branch");
+        actions.put("/branch/purgeBranchData", "Wiped a branch's data");
         actions.put("/role/saveRole", "Saved a role");
         actions.put("/role/deleteRole", "Deleted a role");
         actions.put("/role/savePermission", "Changed role permissions");

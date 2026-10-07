@@ -4,7 +4,9 @@ import com.midland.saloon.Setting.Dto.BranchDTO;
 import com.midland.saloon.Setting.Dto.ExpiringBranchDTO;
 import com.midland.saloon.Setting.Model.Branch;
 import com.midland.saloon.Setting.Projection.BranchProjection;
+import com.midland.saloon.Setting.Service.BranchDataPurgeService;
 import com.midland.saloon.Setting.Service.BranchService;
+import java.util.Map;
 import com.midland.saloon.Uaa.Model.User;
 import com.midland.saloon.Utils.PageableParam;
 import com.midland.saloon.Utils.Responses.Response;
@@ -20,6 +22,20 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class BranchController {
     private final BranchService branchService;
+    private final BranchDataPurgeService branchDataPurgeService;
+
+    /**
+     * Wipes a branch's working data (sales, services, stylists, store,
+     * reports...) and keeps the branch, its users and its subscription.
+     * ROOT only; the body must carry the branch code typed back as
+     * {"confirmCode": "..."}. The service checks both again.
+     */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('ROOT')")
+    @PostMapping("/purgeBranchData/{branchUID}")
+    public Response<Map<String, Integer>> purgeBranchData(@PathVariable String branchUID,
+                                                          @RequestBody Map<String, String> body) {
+        return branchDataPurgeService.purge(branchUID, body.get("confirmCode"));
+    }
 
     @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_BRANCH')")
     @PostMapping("/saveBranch")
