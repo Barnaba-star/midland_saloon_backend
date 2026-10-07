@@ -156,7 +156,7 @@ public class SaloonController {
     public ResponseList<SaloonSales> saveSaloonSales(@RequestBody SaloonSalesDTO saloonSalesDTO){
         return saloonService.saveSaloonSales(saloonSalesDTO);
     }
-    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_SALES)")
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_SALES')")
     @GetMapping("/findSaloonSalesByUID/{saloonSalesUID}")
     public Response<SaloonProjection> findSaloonSalesByUID(@PathVariable String saloonSalesUID){
         return saloonService.findSaloonSalesByUID(saloonSalesUID);
