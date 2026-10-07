@@ -101,9 +101,11 @@ public class BranchMessageService {
         if (branch == null) {
             return new ResponseList<>(new ArrayList<>());
         }
+        List<BranchMessage> messages = messageRepository.findForBranch(branch.getUid());
+        java.util.Map<String, Long> replyCounts = replyCounts(messages);
         List<BranchMessageDTO> rows = new ArrayList<>();
-        for (BranchMessage message : messageRepository.findForBranch(branch.getUid())) {
-            rows.add(toDTO(message, false));
+        for (BranchMessage message : messages) {
+            rows.add(toListDTO(message, replyCounts));
         }
         return new ResponseList<>(rows);
     }
@@ -130,7 +132,8 @@ public class BranchMessageService {
                 // The query sets its own order, so the pageable must not.
                 pageableParam.pageable(false));
 
-        return new ResponsePage<>(page.map(message -> toDTO(message, false)));
+        java.util.Map<String, Long> replyCounts = replyCounts(page.getContent());
+        return new ResponsePage<>(page.map(message -> toListDTO(message, replyCounts)));
     }
 
     /** How many threads are still waiting on us, for the menu badge. */
@@ -266,7 +269,45 @@ public class BranchMessageService {
         }
     }
 
+    /**
+     * Reply counts for a list of threads in one select. A list only shows the
+     * count, and loading every thread's replies to count them was one query
+     * per row.
+     */
+    private java.util.Map<String, Long> replyCounts(List<BranchMessage> messages) {
+        java.util.Map<String, Long> counts = new java.util.HashMap<>();
+        List<String> uids = messages.stream().map(BranchMessage::getUid).toList();
+        if (uids.isEmpty()) {
+            return counts;
+        }
+        for (Object[] row : replyRepository.countForMessages(uids)) {
+            counts.put((String) row[0], ((Number) row[1]).longValue());
+        }
+        return counts;
+    }
+
+    /** The list row: everything toDTO(message, false) gives, with the count already known. */
+    private BranchMessageDTO toListDTO(BranchMessage message, java.util.Map<String, Long> replyCounts) {
+        BranchMessageDTO dto = baseDTO(message);
+        dto.setReplyCount(replyCounts.getOrDefault(message.getUid(), 0L).intValue());
+        return dto;
+    }
+
     private BranchMessageDTO toDTO(BranchMessage message, boolean withReplies) {
+        BranchMessageDTO dto = baseDTO(message);
+        List<BranchMessageReply> replies = replyRepository.findForMessage(message.getUid());
+        dto.setReplyCount(replies.size());
+        if (withReplies) {
+            List<BranchMessageReplyDTO> rows = new ArrayList<>();
+            for (BranchMessageReply reply : replies) {
+                rows.add(toReplyDTO(reply));
+            }
+            dto.setReplies(rows);
+        }
+        return dto;
+    }
+
+    private BranchMessageDTO baseDTO(BranchMessage message) {
         BranchMessageDTO dto = new BranchMessageDTO();
         dto.setUid(message.getUid());
         dto.setBranchName(message.getBranchName());
@@ -286,16 +327,6 @@ public class BranchMessageService {
         dto.setCreatedAt(message.getLastActivityAt());
         dto.setLastActivityAt(message.getLastActivityAt());
         dto.setAwaitingReply(Boolean.TRUE.equals(message.getAwaitingReply()));
-
-        List<BranchMessageReply> replies = replyRepository.findForMessage(message.getUid());
-        dto.setReplyCount(replies.size());
-        if (withReplies) {
-            List<BranchMessageReplyDTO> rows = new ArrayList<>();
-            for (BranchMessageReply reply : replies) {
-                rows.add(toReplyDTO(reply));
-            }
-            dto.setReplies(rows);
-        }
         return dto;
     }
 
