@@ -49,8 +49,11 @@ public class Initializer implements ApplicationRunner {
         seedPermissions();
         seedSuperRole();
         seedStandardRoles();
-        seedSuperUser();
+        // The main branch first: the super user is put on it. The other way
+        // round, a fresh database got a root user with no branch, and every
+        // login failed making its token.
         seedRootBranch();
+        seedSuperUser();
         platformSettingService.seedIfMissing();
         regionService.seedIfMissing(BranchCodeHelper.SEED_REGION_CODES);
     }
@@ -335,6 +338,10 @@ public class Initializer implements ApplicationRunner {
                 e.printStackTrace();
                 throw new Exception("Error in Saving Super User");
             }
+        } else if (user.getBranch() == null && branch != null) {
+            // A root user seeded before the main branch existed: put it there.
+            user.setBranch(branch);
+            userRepository.save(user);
         }
     }
 

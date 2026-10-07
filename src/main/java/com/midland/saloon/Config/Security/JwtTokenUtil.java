@@ -55,7 +55,9 @@ public class JwtTokenUtil {
         Integer sessionHours = platformSettingService.current().getSessionHours();
         long expirationTime = 1000L * 60 * 60 * (sessionHours == null ? 24 : sessionHours);
         Boolean isRoot = user.getIsRoot();
-        String branchUID = user.getBranch().getUid();
+        // A user with no branch gets a token without one (it opens nothing
+        // branch-bound) rather than a failed login.
+        String branchUID = user.getBranch() == null ? null : user.getBranch().getUid();
         String fullName = String.format("%s             %s", user.getFirstName(), user.getLastName());
         String email = user.getEmail();
         // An account with no roles used to be handed "ROOT" here - the highest
