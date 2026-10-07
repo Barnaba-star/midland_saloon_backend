@@ -21,6 +21,29 @@ public class JwtTokenUtil {
     @Value("${jwt.secret}")
     private String PRIVATE_KEY;
 
+    /**
+     * Token signing reads the secret as base64. A host that generates the
+     * secret (Render) may hand over one that isn't - a '-' or '_' in it made
+     * every login fail. Such a secret is turned into a base64 key (its
+     * SHA-512) once at startup; a base64 secret is used as it is.
+     */
+    @jakarta.annotation.PostConstruct
+    void normaliseSecret() throws java.security.NoSuchAlgorithmException {
+        String secret = PRIVATE_KEY == null ? "" : PRIVATE_KEY.trim();
+        try {
+            byte[] raw = java.util.Base64.getDecoder().decode(secret);
+            if (raw.length >= 64) {
+                PRIVATE_KEY = secret;
+                return;
+            }
+        } catch (IllegalArgumentException notBase64) {
+            // fall through
+        }
+        byte[] digest = java.security.MessageDigest.getInstance("SHA-512")
+                .digest(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        PRIVATE_KEY = java.util.Base64.getEncoder().encodeToString(digest);
+    }
+
     private final PlatformSettingService platformSettingService;
 
 

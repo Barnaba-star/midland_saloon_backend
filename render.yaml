@@ -1,0 +1,63 @@
+# Midland Saloon on Render - the whole thing from one Blueprint:
+# Postgres, the Spring Boot backend (this repo) and the Angular frontend
+# (midland_saloon_frontend). All free-plan for now (trial): the services
+# sleep after 15 idle minutes, the free database expires after 30 days
+# unless upgraded, and uploads under /tmp are lost on every deploy.
+# Region Frankfurt - the closest Render region to Tanzania's traffic path.
+
+databases:
+  - name: midland-saloon-db
+    plan: free
+    region: frankfurt
+    databaseName: midland_saloon
+    user: midland
+
+services:
+  - type: web
+    name: midland-saloon-backend
+    runtime: docker
+    repo: https://github.com/Barnaba-star/midland_saloon_backend
+    branch: main
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: frankfurt
+    envVars:
+      - key: DB_HOST
+        fromDatabase: { name: midland-saloon-db, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: midland-saloon-db, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: midland-saloon-db, property: database }
+      - key: DB_USER
+        fromDatabase: { name: midland-saloon-db, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: midland-saloon-db, property: password }
+      # Render makes a random base64 value - token signing needs base64.
+      - key: JWT_SECRET
+        generateValue: true
+      # The first ROOT login's password (root@root.com). Read it from this
+      # service's Environment tab in the Render dashboard; change it after
+      # the first sign-in.
+      - key: ROOT_PASSWORD
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: https://midland-saloon.onrender.com
+      - key: UPLOAD_DIR
+        value: /tmp/uploads/
+      - key: SNIPPE_WEBHOOK_URL
+        value: https://midland-saloon-backend.onrender.com/setting/webhooks/snippe
+      # Payments: paste the keys in the dashboard when Saloon should take
+      # real money. Left empty, the app runs and payment calls fail.
+      - key: SNIPPE_API_KEY
+        sync: false
+      - key: SNIPPE_WEBHOOK_SECRET
+        sync: false
+
+  - type: web
+    name: midland-saloon
+    runtime: docker
+    repo: https://github.com/Barnaba-star/midland_saloon_frontend
+    branch: main
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: frankfurt

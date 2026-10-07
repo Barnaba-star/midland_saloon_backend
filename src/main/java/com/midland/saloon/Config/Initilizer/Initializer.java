@@ -313,7 +313,11 @@ public class Initializer implements ApplicationRunner {
         if(user == null){
             User superUser = new User();
             superUser.setUsername("root@root.com");
-            superUser.setPassword(passwordEncoder.encode("root"));
+            // On a server the first password comes from ROOT_PASSWORD (Render
+            // generates one); "root" is only for a database on this computer.
+            String rootPassword = System.getenv("ROOT_PASSWORD");
+            superUser.setPassword(passwordEncoder.encode(
+                    rootPassword == null || rootPassword.isBlank() ? "root" : rootPassword));
             superUser.setIsRoot(true);
             superUser.setEmail("root@root.com");
             superUser.setGender("MALE");
