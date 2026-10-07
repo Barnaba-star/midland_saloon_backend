@@ -18,7 +18,13 @@ import lombok.*;
         @Index(
                 name = "idx_sales_open_active",
                 columnList = "is_active"
-        )
+        ),
+        // Bills by period (sales history) and today's open bills.
+        @Index(name = "idx_sales_open_branch_created", columnList = "branch_uid, created_at"),
+        // Pending-bill count and amount on the dashboard.
+        @Index(name = "idx_sales_open_branch_payment", columnList = "branch_uid, payment_status"),
+        // A cashier's takings for a cash-up.
+        @Index(name = "idx_sales_open_branch_paid_by", columnList = "branch_uid, paid_by, paid_at")
 })
 public class SalesOpened extends TenantEntity {
 

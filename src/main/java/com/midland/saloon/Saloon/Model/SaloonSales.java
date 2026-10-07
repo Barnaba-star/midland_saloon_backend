@@ -19,7 +19,11 @@ import lombok.*;
         @Index(
                 name = "idx_saloon_sales_active",
                 columnList = "is_active"
-        )
+        ),
+        // Today's lines and the insight reports by period.
+        @Index(name = "idx_saloon_sales_branch_created", columnList = "branch_uid, created_at"),
+        // The lines of one bill.
+        @Index(name = "idx_saloon_sales_bill", columnList = "sales_opened")
 })
 public class SaloonSales extends TenantEntity {
     @ManyToOne(fetch = FetchType.LAZY)

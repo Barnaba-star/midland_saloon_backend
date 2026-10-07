@@ -23,7 +23,9 @@ import java.time.temporal.TemporalAdjusters;
         @Index(
                 name = "idx_staff_commissions_active",
                 columnList = "is_active"
-        )
+        ),
+        @Index(name = "idx_staff_commissions_branch_created", columnList = "branch_uid, created_at"),
+        @Index(name = "idx_staff_commissions_staff", columnList = "saloon_staff_uid")
 })
 public class StaffCommissions extends TenantEntity {
     @Column(name = "payment_status")

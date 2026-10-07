@@ -28,7 +28,10 @@ import java.time.LocalDate;
         @Index(
                 name = "idx_income_expenses_description_active",
                 columnList = "is_active"
-        )
+        ),
+        @Index(name = "idx_income_expenses_description_parent", columnList = "income_expenses_uid"),
+        // A cashier's payouts for a cash-up.
+        @Index(name = "idx_income_expenses_description_paid_by", columnList = "branch_uid, paid_by, paid_at")
 })
 public class IncomeExpensesDescription extends TenantEntity {
 

@@ -21,7 +21,8 @@ import java.time.LocalDate;
         @Index(
                 name = "idx_store_active",
                 columnList = "is_active"
-        )
+        ),
+        @Index(name = "idx_store_service", columnList = "saloon_service_entity_uid")
 })
 public class Store extends TenantEntity {
     @Column(name = "name_of_store")

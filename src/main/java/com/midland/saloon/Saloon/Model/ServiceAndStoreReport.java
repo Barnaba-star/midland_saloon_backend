@@ -19,7 +19,9 @@ import lombok.*;
         @Index(
                 name = "idx_service_store_report_active",
                 columnList = "is_active"
-        )
+        ),
+        @Index(name = "idx_service_store_report_store_open", columnList = "store_open_uid"),
+        @Index(name = "idx_service_store_report_report", columnList = "saloon_report_uid")
 })
 public class ServiceAndStoreReport extends TenantEntity {
     @ManyToOne(fetch = FetchType.LAZY)
