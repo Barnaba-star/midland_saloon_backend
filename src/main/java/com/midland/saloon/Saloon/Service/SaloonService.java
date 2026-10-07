@@ -717,6 +717,10 @@ public class SaloonService {
         }
 
         List<IncomeExpenses> result = new ArrayList<>();
+        // This week's pots per branch, read once and kept up to date here.
+        // Each of the eleven buckets of every service on the sale used to look
+        // its pot up with a query of its own (each forcing a flush first).
+        Map<String, Map<String, IncomeExpenses>> pots = new HashMap<>();
 
         /*
          * Leo
@@ -776,7 +780,8 @@ public class SaloonService {
                     commission.getStaffPercent(),
                     branchUID,
                     weekStartDate,
-                    result
+                    result,
+                    pots
             );
 
             /*
@@ -790,7 +795,8 @@ public class SaloonService {
                     commission.getOwnerPercent(),
                     branchUID,
                     weekStartDate,
-                    result
+                    result,
+                    pots
             );
 
             /*
@@ -804,7 +810,8 @@ public class SaloonService {
                     commission.getTraPercent(),
                     branchUID,
                     weekStartDate,
-                    result
+                    result,
+                    pots
             );
 
             /*
@@ -818,7 +825,8 @@ public class SaloonService {
                     commission.getEmergencyPercent(),
                     branchUID,
                     weekStartDate,
-                    result
+                    result,
+                    pots
             );
 
             /*
@@ -832,7 +840,8 @@ public class SaloonService {
                     commission.getMaintenancePercent(),
                     branchUID,
                     weekStartDate,
-                    result
+                    result,
+                    pots
             );
 
             /*
@@ -840,7 +849,7 @@ public class SaloonService {
              * OTHER
              * =========================
              */
-            addOtherIncome(amount, commission.getOtherPercent(), branchUID, weekStartDate, result, today);
+            addOtherIncome(amount, commission.getOtherPercent(), branchUID, weekStartDate, result, today, pots);
 
             /*
              * =========================
@@ -853,7 +862,8 @@ public class SaloonService {
                     commission.getLukuPercent(),
                     branchUID,
                     weekStartDate,
-                    result
+                    result,
+                    pots
             );
 
             /*
@@ -867,7 +877,8 @@ public class SaloonService {
                     commission.getWaterPercent(),
                     branchUID,
                     weekStartDate,
-                    result
+                    result,
+                    pots
             );
 
             /*
@@ -881,7 +892,8 @@ public class SaloonService {
                     commission.getRentPercent(),
                     branchUID,
                     weekStartDate,
-                    result
+                    result,
+                    pots
             );
 
             /*
@@ -895,7 +907,8 @@ public class SaloonService {
                     commission.getLoanPercent(),
                     branchUID,
                     weekStartDate,
-                    result
+                    result,
+                    pots
             );
 
             /*
@@ -909,7 +922,8 @@ public class SaloonService {
                     commission.getStockPurchasePercent(),
                     branchUID,
                     weekStartDate,
-                    result
+                    result,
+                    pots
             );
         }
 
@@ -924,22 +938,24 @@ public class SaloonService {
      * its amount is shared across those items, each into a pot of its own;
      * without one it stays the single "Other" pot it always was.
      */
-    private void addOtherIncome(BigDecimal amount, Integer percent, String branchUID, LocalDate weekStartDate, List<IncomeExpenses> result, LocalDate day) {
+    private void addOtherIncome(BigDecimal amount, Integer percent, String branchUID, LocalDate weekStartDate, List<IncomeExpenses> result, LocalDate day,
+                                Map<String, Map<String, IncomeExpenses>> pots) {
         if (percent == null || percent <= 0) {
             return;
         }
         BigDecimal other = amount.multiply(BigDecimal.valueOf(percent)).divide(BigDecimal.valueOf(100));
         java.util.Map<String, BigDecimal> parts = otherCommissionService.split(other, branchUID);
         if (parts.isEmpty()) {
-            addIncomeExpense("Other", amount, percent, branchUID, weekStartDate, result);
+            addIncomeExpense("Other", amount, percent, branchUID, weekStartDate, result, pots);
             return;
         }
         // Each share is already in shillings - taken at 100% it lands as it is.
-        parts.forEach((pot, share) -> addIncomeExpense(pot, share, 100, branchUID, weekStartDate, result));
+        parts.forEach((pot, share) -> addIncomeExpense(pot, share, 100, branchUID, weekStartDate, result, pots));
         otherCommissionService.record(parts, day);
     }
 
-    private void addIncomeExpense(String name, BigDecimal amount, Integer percent, String branchUID, LocalDate weekStartDate, List<IncomeExpenses> result) {
+    private void addIncomeExpense(String name, BigDecimal amount, Integer percent, String branchUID, LocalDate weekStartDate, List<IncomeExpenses> result,
+                                  Map<String, Map<String, IncomeExpenses>> pots) {
 
         /*
          * Kama percentage haipo
@@ -974,12 +990,11 @@ public class SaloonService {
          * branch
          * week
          */
-        Optional<IncomeExpenses> existing =
-                incomeExpensesRepository.findByNameAndWeek(
-                        name,
-                        branchUID,
-                        weekStartDate
-                );
+        Map<String, IncomeExpenses> weekPots = pots.computeIfAbsent(
+                branchUID + "|" + weekStartDate,
+                key -> loadWeekPots(branchUID, weekStartDate)
+        );
+        Optional<IncomeExpenses> existing = Optional.ofNullable(weekPots.get(name));
 
         /*
          * ============================
@@ -1022,6 +1037,7 @@ public class SaloonService {
                     incomeExpensesRepository.save(
                             incomeExpenses
                     );
+            weekPots.put(name, updated);
 
             /*
              * Add kwenye response
@@ -1087,12 +1103,21 @@ public class SaloonService {
                     incomeExpensesRepository.save(
                             incomeExpenses
                     );
+            weekPots.put(name, saved);
 
             /*
              * Add kwenye response
              */
             result.add(saved);
         }
+    }
+    /** A branch's pots for one week, by name - what findByNameAndWeek answered one name at a time. */
+    private Map<String, IncomeExpenses> loadWeekPots(String branchUID, LocalDate weekStartDate) {
+        Map<String, IncomeExpenses> byName = new HashMap<>();
+        for (IncomeExpenses pot : incomeExpensesRepository.findByBranchAndWeek(branchUID, weekStartDate)) {
+            byName.putIfAbsent(pot.getName(), pot);
+        }
+        return byName;
     }
     public ResponseList<IncomeExpenses> getIncomeExpenses(String filter) {
         LocalDate today = LocalDate.now();

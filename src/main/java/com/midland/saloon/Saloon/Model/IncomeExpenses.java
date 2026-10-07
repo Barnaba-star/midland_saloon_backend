@@ -28,7 +28,9 @@ import java.util.List;
                 @Index(
                         name = "idx_income_expenses_active",
                         columnList = "is_active"
-                )
+                ),
+        // The pots by week range.
+        @Index(name = "idx_income_expenses_branch_week", columnList = "branch_uid, week_start_date")
         },
 
         uniqueConstraints = {

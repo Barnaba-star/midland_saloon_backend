@@ -26,7 +26,8 @@ import java.util.List;
         @Index(
                 name = "idx_stock_and_purchase_active",
                 columnList = "is_active"
-        )
+        ),
+        @Index(name = "idx_stock_and_purchase_branch_week", columnList = "branch_uid, week_date")
 })
 public class StockAndPurchase extends TenantEntity {
     @Column(name = "payment_status")

@@ -26,6 +26,19 @@ public interface IncomeExpensesRepository
                 @Param("weekStartDate") LocalDate weekStartDate
         );
 
+        /** Every active pot of a branch for one week - the same rows findByNameAndWeek finds one name at a time. */
+        @Query("""
+            SELECT ie
+            FROM IncomeExpenses ie
+            WHERE ie.branchUid = :branchUID
+              AND ie.isActive = true
+              AND ie.weekStartDate = :weekStartDate
+            """)
+        List<IncomeExpenses> findByBranchAndWeek(
+                @Param("branchUID") String branchUID,
+                @Param("weekStartDate") LocalDate weekStartDate
+        );
+
         @Query("""
         SELECT ie
         FROM IncomeExpenses ie

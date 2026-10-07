@@ -28,7 +28,7 @@ public interface SaloonSalesRepository extends JpaRepository<SaloonSales, String
             st.firstName as firstName, st.middleName as middleName, st.lastName as lastName,
             ss.serviceName as serviceName, ss.serviceCode as serviceCode, ss.price as price
             FROM SaloonSales s LEFT JOIN s.saloonStaff st LEFT JOIN s.saloonServiceEntity ss
-            LEFT JOIN SalesOpened so WHERE s.uid=:saloonSalesUID AND s.branchUid=:branchUID AND s.isActive=true
+            LEFT JOIN s.salesOpened so WHERE s.uid=:saloonSalesUID AND s.branchUid=:branchUID AND s.isActive=true
             """)
     Optional<SaloonProjection> findSaloonSalesByUID(String saloonSalesUID, String branchUID);
 
@@ -85,7 +85,7 @@ public interface SaloonSalesRepository extends JpaRepository<SaloonSales, String
             st.firstName as firstName, st.middleName as middleName, st.lastName as lastName,
             ss.serviceName as serviceName, ss.serviceCode as serviceCode, ss.price as price
             FROM SaloonSales s LEFT JOIN s.saloonStaff st LEFT JOIN s.saloonServiceEntity ss
-            LEFT JOIN SalesOpened so WHERE  s.branchUid=:branchUID AND s.isActive=true
+            LEFT JOIN s.salesOpened so WHERE  s.branchUid=:branchUID AND s.isActive=true
            """)
     Page<SaloonProjection> findSaloonSalesPage(Pageable pageable, String branchUID);
 }

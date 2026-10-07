@@ -20,7 +20,11 @@ import java.math.BigDecimal;
         @Index(
                 name = "idx_saloon_reports_active",
                 columnList = "is_active"
-        )
+        ),
+        // Every revenue report, the dashboard and the trend line filter on these two.
+        @Index(name = "idx_saloon_reports_branch_created", columnList = "branch_uid, created_at"),
+        @Index(name = "idx_saloon_reports_sales", columnList = "saloon_sales"),
+        @Index(name = "idx_saloon_reports_staff", columnList = "saloon_staff_uid")
 })
 public class SaloonReports extends TenantEntity {
     @ManyToOne(fetch = FetchType.LAZY)

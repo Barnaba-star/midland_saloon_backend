@@ -17,6 +17,16 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, String> {
 
+    /**
+     * The heartbeat's write: one column, one statement. Saving the principal
+     * instead merged a detached User - re-reading it with its roles and
+     * branches, then writing every column back - every 30 seconds per user.
+     */
+    @Modifying
+    @org.springframework.transaction.annotation.Transactional
+    @Query("UPDATE User u SET u.lastSeen = :lastSeen WHERE u.uid = :uid")
+    int touchLastSeen(@Param("uid") String uid, @Param("lastSeen") LocalDateTime lastSeen);
+
     @Query("SELECT COUNT(u) > 0 FROM User u WHERE u.username = :username")
     Boolean existByUsername(@Param("username") String username);
 
@@ -40,6 +50,9 @@ public interface UserRepository extends JpaRepository<User, String> {
     // The principal every authenticated request is built from. Branch and roles
     // come back in the same select so the filter does not trigger one lookup per
     // association; role permissions follow in a single batched select.
+    // extraBranches is deliberately not join-fetched here: roles is a List
+    // (a bag), and joining a second collection beside it repeats each role
+    // once per extra branch.
     @Query("""
     SELECT DISTINCT u
     FROM User u
@@ -64,6 +77,10 @@ public interface UserRepository extends JpaRepository<User, String> {
     LEFT JOIN FETCH u.roles WHERE u.branch.uid=:branchUID
 """)
     List<User> findAllUsersWithBranchAndRoles(@Param("branchUID")String branchUID);
+
+    /** Just the ids of a branch's users - the same people as above, without loading them. */
+    @Query("SELECT u.uid FROM User u WHERE u.branch.uid = :branchUID")
+    List<String> findUidsByBranch(@Param("branchUID") String branchUID);
 
     @Query("""
     SELECT

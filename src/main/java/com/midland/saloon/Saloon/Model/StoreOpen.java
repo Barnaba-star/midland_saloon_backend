@@ -21,7 +21,10 @@ import java.time.LocalDate;
         @Index(
                 name = "idx_store_open_active",
                 columnList = "is_active"
-        )
+        ),
+        // Open stores of a branch - looked up on every sale.
+        @Index(name = "idx_store_open_branch_status", columnList = "branch_uid, status"),
+        @Index(name = "idx_store_open_store", columnList = "store_uid")
 })
 public class StoreOpen extends TenantEntity {
     @Column(name = "open_quantity_code")

@@ -21,7 +21,8 @@ import java.time.LocalDate;
         @Index(
                 name = "idx_stock_and_purchase_descriptions_active",
                 columnList = "is_active"
-        )
+        ),
+        @Index(name = "idx_stock_and_purchase_descriptions_parent", columnList = "stock_and_purchase")
 })
 public class StockAndPurchaseDescriptions extends TenantEntity {
     @ManyToOne(fetch = FetchType.LAZY)
