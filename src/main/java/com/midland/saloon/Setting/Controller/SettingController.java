@@ -76,6 +76,12 @@ public class SettingController {
         LocalDateTime cutoffTime = LocalDateTime.now().minusMinutes(2);
         return new ResponseList<>(userRepository.findOnlineUsers(cutoffTime));
     }
+    /** One month's subscription price (Configuration's plan price) - shown wherever someone pays. */
+    @GetMapping("/subscriptionPrice")
+    public Response<Map<String, Object>> subscriptionPrice() {
+        return new Response<>(Map.of("monthly", service.monthlyPrice()));
+    }
+
     /** The date a free plan set today would end, and the trial days it comes from - shown on the plan form. */
     @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_BRANCH')")
     @GetMapping("/freePlanEnd")

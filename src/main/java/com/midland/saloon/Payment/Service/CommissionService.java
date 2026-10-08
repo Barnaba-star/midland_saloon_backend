@@ -72,12 +72,12 @@ public class CommissionService {
         payment.setMonths(months);
         payment.setPaidAt(LocalDate.now());
 
-        // Fall back to the branch's configured rate if the webhook didn't
+        // Fall back to Configuration's plan price if the webhook didn't
         // carry an amount - better a computed figure than a null in a
         // report someone is about to pay real money against.
         int paid = amount != null && amount > 0
                 ? amount
-                : (branch.getSubscriptionAmount() != null ? branch.getSubscriptionAmount() * months : 0);
+                : java.util.Objects.requireNonNullElse(platformSettingService.current().getDefaultSubscriptionAmount(), 0) * months;
         payment.setAmount(paid);
 
         // Read per payment, not once at startup: the rate is snapshot onto

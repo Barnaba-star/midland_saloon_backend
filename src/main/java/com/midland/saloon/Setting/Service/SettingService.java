@@ -49,6 +49,16 @@ public class SettingService {
         return new ResponseList<>(repository.findTableSizes());
     }
 
+    /**
+     * What one month of subscription costs: Configuration's plan price, the
+     * same for every branch (owner's choice, 2026-10-08) - not the branch's
+     * own amount.
+     */
+    public int monthlyPrice() {
+        Integer price = platformSettingService.current().getDefaultSubscriptionAmount();
+        return price == null ? 0 : price;
+    }
+
     /** Where a free plan set today ends: today + Configuration's trial days (30 if unset). */
     public LocalDate freePlanEnd() {
         Integer days = platformSettingService.current().getTrialDays();
@@ -116,10 +126,11 @@ public class SettingService {
 
         Branch branch = optionalBranch.get();
 
-        if(branch.getSubscriptionAmount() == null || branch.getSubscriptionAmount() <= 0)
-            return new Response<>("This Branch Has No Subscription Plan Configured Yet, Contact Admin");
+        int monthly = monthlyPrice();
+        if(monthly <= 0)
+            return new Response<>("No Subscription Price Set In Configuration Yet, Contact Admin");
 
-        int amount = branch.getSubscriptionAmount() * subscriptionPaymentDTO.getMonths();
+        int amount = monthly * subscriptionPaymentDTO.getMonths();
 
         // Snippe refuses anything under this and answers with its own raw
         // English text. The dialog already blocks it client-side (it knows the
@@ -178,10 +189,11 @@ public class SettingService {
     /** Shared by both routes: price it, hand off to Snippe, mark it pending. */
     private Response<Branch> startSubscriptionPayment(Branch branch, User user, int months, String phoneNumber) {
 
-        if (branch.getSubscriptionAmount() == null || branch.getSubscriptionAmount() <= 0)
-            return new Response<>("This Branch Has No Subscription Plan Configured Yet, Contact Admin");
+        int monthly = monthlyPrice();
+        if (monthly <= 0)
+            return new Response<>("No Subscription Price Set In Configuration Yet, Contact Admin");
 
-        int amount = branch.getSubscriptionAmount() * months;
+        int amount = monthly * months;
 
         int minimum = platformSettingService.current().getMinimumPaymentAmount();
         if (amount < minimum)
