@@ -49,12 +49,16 @@ public class SettingService {
         return new ResponseList<>(repository.findTableSizes());
     }
 
+    /** Where a free plan set today ends: today + Configuration's trial days (30 if unset). */
+    public LocalDate freePlanEnd() {
+        Integer days = platformSettingService.current().getTrialDays();
+        return LocalDate.now().plusDays(days == null || days <= 0 ? 30 : days);
+    }
+
     public Response<Branch> saveBranchSubscription(BranchDTO branchDTO){
         log.info(LoggerUser.getEmail() + "Is Saving Branch Subscription");
         if(branchDTO == null)
             return new Response<>("Provide Data For Branch Subscription");
-        if(branchDTO.getCloseSubscription() == null)
-            return new Response<>("Provide Subscription End Date");
         if(branchDTO.getSubscriptionAmount() == null)
             return new Response<>("Provide Amount For Subscription");
         if(branchDTO.getUid() == null)
@@ -66,7 +70,11 @@ public class SettingService {
         if(!branchService.canTouch(optionalBranch.get()))
             return new Response<>("Branch Not Found");
         Branch branch = optionalBranch.get();
-        branch.setCloseSubscription(branchDTO.getCloseSubscription());
+        // The free plan runs from today for Configuration's trial days, unless
+        // a date was sent (older clients still send one).
+        branch.setCloseSubscription(branchDTO.getCloseSubscription() != null
+                ? branchDTO.getCloseSubscription()
+                : freePlanEnd());
         branch.setOpenSubscription(LocalDate.now());
         branch.setSubscriptionAmount(branchDTO.getSubscriptionAmount());
         branch.setSubscriptionStatus("FREE");

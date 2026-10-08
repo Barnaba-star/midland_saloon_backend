@@ -76,6 +76,16 @@ public class SettingController {
         LocalDateTime cutoffTime = LocalDateTime.now().minusMinutes(2);
         return new ResponseList<>(userRepository.findOnlineUsers(cutoffTime));
     }
+    /** The date a free plan set today would end, and the trial days it comes from - shown on the plan form. */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_BRANCH')")
+    @GetMapping("/freePlanEnd")
+    public Response<Map<String, Object>> freePlanEnd() {
+        java.time.LocalDate end = service.freePlanEnd();
+        return new Response<>(Map.of(
+                "closeSubscription", end.toString(),
+                "trialDays", java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), end)));
+    }
+
     @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_BRANCH')")
     @PostMapping("/saveBranchSubscription")
     public Response<Branch> saveBranchSubscription(@RequestBody BranchDTO branchDTO){
