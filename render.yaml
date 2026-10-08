@@ -41,7 +41,7 @@ services:
       - key: ROOT_PASSWORD
         generateValue: true
       - key: CORS_ORIGIN
-        value: https://midland-saloon.onrender.com
+        value: https://mr-saloon.onrender.com,https://midland-saloon.onrender.com
       - key: UPLOAD_DIR
         value: /tmp/uploads/
       - key: SNIPPE_WEBHOOK_URL
