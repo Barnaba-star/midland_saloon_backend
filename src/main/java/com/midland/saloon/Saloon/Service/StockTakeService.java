@@ -39,6 +39,7 @@ public class StockTakeService {
     private final StockTakeRepository stockTakeRepository;
     private final StockTakeLineRepository lineRepository;
     private final WorkShiftService workShiftService;
+    private final com.midland.saloon.Config.Security.AuthChecker authChecker;
 
     /** What a count goes through: every active store item with its unopened units now. */
     public ResponseList<Map<String, Object>> countable() {
@@ -81,6 +82,9 @@ public class StockTakeService {
         take.setItemsCounted(dto.getLines().size());
         // Counted at a shift (open, or closed and being handed over): the loss is that shift's.
         WorkShift shift = workShiftService.currentForCount(branchUID, LoggerUser.getEmail()).orElse(null);
+        // Without SAVE_STORE (a cashier) the count is part of their own shift's handover.
+        if (shift == null && !Boolean.TRUE.equals(authChecker.hasPermissionOrRoot("SAVE_STORE")))
+            return new Response<>("Hesabu ya store inafanyika ndani ya zamu yako - fungua au funga zamu kwanza (Count the store at your shift)");
         if (shift != null) {
             take.setShiftUid(shift.getUid());
             take.setShiftCashierEmail(shift.getCashierEmail());

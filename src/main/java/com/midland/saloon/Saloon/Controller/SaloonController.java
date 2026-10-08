@@ -458,13 +458,14 @@ public class SaloonController {
      STOCK TAKE - counting the store's unopened items at once (SAVE_STORE);
      its history and the variance by item follow VIEW_STORE.
      */
-    @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_STORE')")
+    // A cashier (SAVE_SALES) counts too, at their shift's handover - the service checks the shift.
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_STORE') or @authChecker.hasPermissionOrRoot('SAVE_SALES')")
     @GetMapping("/stockTake/items")
     public ResponseList<java.util.Map<String, Object>> stockTakeItems(){
         return stockTakeService.countable();
     }
 
-    @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_STORE')")
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_STORE') or @authChecker.hasPermissionOrRoot('SAVE_SALES')")
     @PostMapping("/stockTake/submit")
     public Response<com.midland.saloon.Saloon.Model.StockTake> stockTakeSubmit(@RequestBody com.midland.saloon.Saloon.Dto.StockTakeDTO dto){
         return stockTakeService.submit(dto);
