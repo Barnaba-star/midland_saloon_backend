@@ -2374,10 +2374,20 @@ public class SaloonService {
         if(optionalSaloonServiceEntity.isEmpty())
             return new Response<>("Service Not Found");
         store.setSaloonServiceEntity(optionalSaloonServiceEntity.get());
-        if(storeDTO.getBuyingPrice() == null)
+        // The price per item, the price of the whole lot, or both: the
+        // missing one comes from the quantity.
+        Integer unit = storeDTO.getBuyingPrice();
+        Integer total = storeDTO.getTotalPrice();
+        if (unit == null && total == null)
             return new Response<>("Provide Buying Price For Store");
-        store.setBuyingPrice(storeDTO.getBuyingPrice());
-        store.setTotalQuantityPrice(storeDTO.getBuyingPrice() * storeDTO.getQuantity());
+        if (storeDTO.getQuantity() <= 0)
+            return new Response<>("Quantity must be more than zero");
+        if (unit == null)
+            unit = Math.round((float) total / storeDTO.getQuantity());
+        if (total == null)
+            total = unit * storeDTO.getQuantity();
+        store.setBuyingPrice(unit);
+        store.setTotalQuantityPrice(total);
         store.setNotUsedQuantity(storeDTO.getQuantity());
 
         try{
@@ -2416,6 +2426,10 @@ public class SaloonService {
                 .toUpperCase();
         return cleanName.substring(0, Math.min(3, cleanName.length()));
     }
+    private static int nz(Integer v) {
+        return v == null ? 0 : v;
+    }
+
     public Response<Store> addQuantityToStore(StoreDTO storeDTO){
         log.info(LoggerUser.getEmail() + "Is adding quantity to the store items");
         if(storeDTO == null)
@@ -2429,9 +2443,20 @@ public class SaloonService {
         }else{
             store = new Store();
         }
-        store.setQuantity(store.getQuantity() + storeDTO.getQuantity());
-        store.setNotUsedQuantity(store.getNotUsedQuantity() + storeDTO.getQuantity());
-        store.setTotalQuantityPrice(store.getTotalQuantityPrice() + (storeDTO.getQuantity())*store.getBuyingPrice());
+        if (storeDTO.getQuantity() == null || storeDTO.getQuantity() <= 0)
+            return new Response<>("Provide Quantity To Add");
+        // This delivery's cost: its whole-lot price, or its price per item,
+        // or (neither given) the item's current price per item.
+        int added = storeDTO.getQuantity();
+        int lotCost = storeDTO.getTotalPrice() != null
+                ? storeDTO.getTotalPrice()
+                : added * (storeDTO.getBuyingPrice() != null ? storeDTO.getBuyingPrice() : nz(store.getBuyingPrice()));
+        store.setQuantity(nz(store.getQuantity()) + added);
+        store.setNotUsedQuantity(nz(store.getNotUsedQuantity()) + added);
+        store.setTotalQuantityPrice(nz(store.getTotalQuantityPrice()) + lotCost);
+        // Price per item becomes the average over everything bought.
+        if (store.getQuantity() > 0)
+            store.setBuyingPrice(Math.round((float) store.getTotalQuantityPrice() / store.getQuantity()));
         try{
             return new Response<>(storeRepository.save(store));
         }catch (Exception e){
