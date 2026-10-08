@@ -45,7 +45,9 @@ public class Role extends BaseEntity {
     @JoinTable(
             name = "role_permission",
             joinColumns=@JoinColumn(name = "role_uid"),
-            inverseJoinColumns = @JoinColumn(name = "permission_uid")
+            inverseJoinColumns = @JoinColumn(name = "permission_uid"),
+            // No index before: loading a role's permissions scanned the table.
+            indexes = @Index(name = "idx_role_permission_role", columnList = "role_uid")
     )
     private List<Permission> permission;
 

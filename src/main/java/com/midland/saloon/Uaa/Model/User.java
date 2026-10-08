@@ -84,7 +84,14 @@ public class User extends BaseEntity {
     @JoinTable(
             name = "user_roles",
             joinColumns = @JoinColumn(name = "user_uid"),
-            inverseJoinColumns = @JoinColumn(name = "role_uid")
+            inverseJoinColumns = @JoinColumn(name = "role_uid"),
+            // The table had no index at all: the principal's roles (every
+            // login and request) and everyone-holding-a-role (payroll,
+            // commission report) both scanned it whole.
+            indexes = {
+                    @Index(name = "idx_user_roles_user", columnList = "user_uid"),
+                    @Index(name = "idx_user_roles_role", columnList = "role_uid")
+            }
     )
     @org.hibernate.annotations.OnDelete(action = org.hibernate.annotations.OnDeleteAction.CASCADE)
     private List<Role> roles;

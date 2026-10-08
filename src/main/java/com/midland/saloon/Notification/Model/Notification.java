@@ -27,7 +27,10 @@ import java.time.LocalDateTime;
 @Setter
 @ToString
 @Table(name = "notifications", indexes = {
-        @Index(name = "idx_notification_target_user", columnList = "target_user_uid")
+        @Index(name = "idx_notification_target_user", columnList = "target_user_uid"),
+        // The bell's list: one user's newest first, a page at a time. Every paid
+        // bill notifies every user of the branch, so this table grows fastest.
+        @Index(name = "idx_notification_target_notified", columnList = "target_user_uid, notified_at")
 })
 public class Notification extends BaseEntity {
 
