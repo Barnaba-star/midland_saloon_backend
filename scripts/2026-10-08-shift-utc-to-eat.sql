@@ -15,15 +15,11 @@ INSERT INTO tz_shift_2026_10_08 DEFAULT VALUES;
 
 -- Days first, while the old times still say which rows fell between 00:00
 -- and 03:00 Tanzania time (21:00-24:00 UTC): those were filed under the
--- previous day.
-UPDATE saloon_sales SET created_at = (sold_at + interval '3 hours')::date
- WHERE sold_at < timestamp '2026-10-08 16:00' AND created_at = sold_at::date AND sold_at::time >= '21:00';
-UPDATE work_shifts SET created_at = (opened_at + interval '3 hours')::date
- WHERE opened_at < timestamp '2026-10-08 16:00' AND created_at = opened_at::date AND opened_at::time >= '21:00';
-UPDATE stock_takes SET created_at = (taken_at + interval '3 hours')::date
- WHERE taken_at < timestamp '2026-10-08 16:00' AND created_at = taken_at::date AND taken_at::time >= '21:00';
-UPDATE stock_receipts SET created_at = (received_at + interval '3 hours')::date
- WHERE received_at < timestamp '2026-10-08 16:00' AND created_at = received_at::date AND received_at::time >= '21:00';
+-- previous day. A table this database doesn't have is skipped.
+DO $$ BEGIN IF to_regclass('public.saloon_sales') IS NOT NULL THEN EXECUTE 'UPDATE saloon_sales SET created_at = (sold_at + interval ''3 hours'')::date WHERE sold_at < timestamp ''2026-10-08 16:00'' AND created_at = sold_at::date AND sold_at::time >= ''21:00'''; END IF; END $$;
+DO $$ BEGIN IF to_regclass('public.work_shifts') IS NOT NULL THEN EXECUTE 'UPDATE work_shifts SET created_at = (opened_at + interval ''3 hours'')::date WHERE opened_at < timestamp ''2026-10-08 16:00'' AND created_at = opened_at::date AND opened_at::time >= ''21:00'''; END IF; END $$;
+DO $$ BEGIN IF to_regclass('public.stock_takes') IS NOT NULL THEN EXECUTE 'UPDATE stock_takes SET created_at = (taken_at + interval ''3 hours'')::date WHERE taken_at < timestamp ''2026-10-08 16:00'' AND created_at = taken_at::date AND taken_at::time >= ''21:00'''; END IF; END $$;
+DO $$ BEGIN IF to_regclass('public.stock_receipts') IS NOT NULL THEN EXECUTE 'UPDATE stock_receipts SET created_at = (received_at + interval ''3 hours'')::date WHERE received_at < timestamp ''2026-10-08 16:00'' AND created_at = received_at::date AND received_at::time >= ''21:00'''; END IF; END $$;
 
 -- Then every date-and-time column in the schema.
 DO $$
