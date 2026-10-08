@@ -17,7 +17,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @NoArgsConstructor
 @Table(name = "stock_takes", indexes = {
-        @Index(name = "idx_stock_take_branch_at", columnList = "branch_uid, taken_at")
+        @Index(name = "idx_stock_take_branch_at", columnList = "branch_uid, taken_at"),
+        @Index(name = "idx_stock_take_shift", columnList = "shift_uid")
 })
 public class StockTake extends TenantEntity {
 
@@ -46,4 +47,18 @@ public class StockTake extends TenantEntity {
 
     @Column(name = "note", length = 500)
     private String note;
+
+    /**
+     * The shift the count was taken at (zamu): a store loss stays on the
+     * shift - and so the cashier - that had the store when it went missing.
+     */
+    @Column(name = "shift_uid")
+    private String shiftUid;
+
+    /** Whose shift it was. */
+    @Column(name = "shift_cashier_email")
+    private String shiftCashierEmail;
+
+    @Column(name = "shift_cashier_name")
+    private String shiftCashierName;
 }

@@ -2,6 +2,7 @@ package com.midland.saloon.Saloon.Service;
 
 import com.midland.saloon.Saloon.Dto.StockTakeDTO;
 import com.midland.saloon.Saloon.Model.StockTake;
+import com.midland.saloon.Saloon.Model.WorkShift;
 import com.midland.saloon.Saloon.Model.StockTakeLine;
 import com.midland.saloon.Saloon.Model.Store;
 import com.midland.saloon.Saloon.Repository.StockTakeLineRepository;
@@ -37,6 +38,7 @@ public class StockTakeService {
     private final StoreRepository storeRepository;
     private final StockTakeRepository stockTakeRepository;
     private final StockTakeLineRepository lineRepository;
+    private final WorkShiftService workShiftService;
 
     /** What a count goes through: every active store item with its unopened units now. */
     public ResponseList<Map<String, Object>> countable() {
@@ -77,6 +79,13 @@ public class StockTakeService {
         String note = dto.getNote() == null ? null : dto.getNote().trim();
         take.setNote(note == null || note.isEmpty() ? null : (note.length() > 500 ? note.substring(0, 500) : note));
         take.setItemsCounted(dto.getLines().size());
+        // Counted at a shift (open, or closed and being handed over): the loss is that shift's.
+        WorkShift shift = workShiftService.currentForCount(branchUID, LoggerUser.getEmail()).orElse(null);
+        if (shift != null) {
+            take.setShiftUid(shift.getUid());
+            take.setShiftCashierEmail(shift.getCashierEmail());
+            take.setShiftCashierName(shift.getCashierName());
+        }
         take = stockTakeRepository.save(take);
 
         int different = 0;

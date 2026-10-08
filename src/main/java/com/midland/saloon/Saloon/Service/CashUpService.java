@@ -2,6 +2,7 @@ package com.midland.saloon.Saloon.Service;
 
 import com.midland.saloon.Saloon.Dto.CashUpDTO;
 import com.midland.saloon.Saloon.Model.CashUp;
+import com.midland.saloon.Saloon.Model.WorkShift;
 import com.midland.saloon.Saloon.Model.CashUpLine;
 import com.midland.saloon.Saloon.Repository.IncomeExpensesDescriptionRepository;
 import com.midland.saloon.Saloon.Repository.CashUpLineRepository;
@@ -21,13 +22,14 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Closing a shift. What a cashier should have in hand is the bills they
- * marked paid themselves (SalesOpened.paidBy) since their last cash-up - or since
- * the day began, for their very first one. Payouts they recorded in the system
+ * Handing over a closed shift (zamu). What a cashier should have in hand is
+ * the bills they marked paid themselves (SalesOpened.paidBy) between opening
+ * and closing that shift (see WorkShiftService). Payouts they recorded in the system
  * in that time (a pot's Pay, staff commission, stock purchase) come off the
  * expected of the method each went by - read from those records, never typed at the cash-up. They
  * count it per method; the cash-up keeps both and the difference, as submitted.
@@ -43,13 +45,17 @@ public class CashUpService {
     private final CashUpLineRepository lineRepository;
     private final SalesOpenedRepository salesOpenedRepository;
     private final IncomeExpensesDescriptionRepository payoutRepository;
+    private final WorkShiftService workShiftService;
 
-    /** The open shift of whoever is signed in: since when, and what each method should hold. */
+    /** The signed-in login's closed shift, waiting for its cash-up: when it ran, and what each method should hold. */
     public Response<Map<String, Object>> preview() {
         String branchUID = LoggerUser.getBranchUID();
         String email = LoggerUser.getEmail();
-        LocalDateTime from = shiftStart(branchUID, email);
-        LocalDateTime to = LocalDateTime.now();
+        Optional<WorkShift> closed = workShiftService.awaitingCashUp(branchUID, email);
+        if (closed.isEmpty())
+            return new Response<>("Funga zamu yako kwanza kabla ya makabidhiano (Close your shift before the cash-up)");
+        LocalDateTime from = closed.get().getOpenedAt();
+        LocalDateTime to = closed.get().getClosedAt();
         Shift shift = shift(branchUID, email, from, to);
 
         List<Map<String, Object>> lines = new ArrayList<>();
@@ -64,6 +70,7 @@ public class CashUpService {
         }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("cashierName", nameOf(LoggerUser.getUser()));
+        body.put("shiftUid", closed.get().getUid());
         body.put("from", from);
         body.put("to", to);
         body.put("lines", lines);
@@ -97,8 +104,11 @@ public class CashUpService {
             }
         }
 
-        LocalDateTime from = shiftStart(branchUID, email);
-        LocalDateTime to = LocalDateTime.now();
+        Optional<WorkShift> closed = workShiftService.awaitingCashUp(branchUID, email);
+        if (closed.isEmpty())
+            return new Response<>("Funga zamu yako kwanza kabla ya makabidhiano (Close your shift before the cash-up)");
+        LocalDateTime from = closed.get().getOpenedAt();
+        LocalDateTime to = closed.get().getClosedAt();
         Shift shift = shift(branchUID, email, from, to);
 
         for (String method : shift.methods()) {
@@ -106,8 +116,6 @@ public class CashUpService {
             if (moved && !counted.containsKey(method))
                 return new Response<>("Enter what you counted for " + method);
         }
-        if (shift.methods().isEmpty() && counted.isEmpty())
-            return new Response<>("Nothing to close - no payments taken and nothing counted");
 
         CashUp cashUp = new CashUp();
         cashUp.setCashierEmail(email);
@@ -148,6 +156,8 @@ public class CashUpService {
             line.setCashUp(saved);
             lineRepository.save(line);
         }
+        // The shift is handed over: the next one may open.
+        workShiftService.markCashedUp(closed.get(), saved);
         return new Response<>(saved);
     }
 
@@ -209,16 +219,6 @@ public class CashUpService {
         int bills(String method) { return bills.getOrDefault(method, 0); }
         long expectedTotal() { return methods().stream().mapToLong(this::expected).sum(); }
         int billCount() { return bills.values().stream().mapToInt(Integer::intValue).sum(); }
-    }
-
-    /**
-     * Where the open shift began: the end of the cashier's last cash-up, whatever
-     * day that was - a bar shift runs past midnight, and takings not yet cashed
-     * up stay theirs to account for. Their first one starts at the day's start.
-     */
-    private LocalDateTime shiftStart(String branchUID, String email) {
-        return cashUpRepository.lastClosedAt(branchUID, email)
-                .orElse(LocalDate.now().atStartOfDay());
     }
 
     private static boolean seesAll() {

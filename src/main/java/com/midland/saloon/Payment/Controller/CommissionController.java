@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 public class CommissionController {
 
     private final CommissionService commissionService;
+    private final com.midland.saloon.Saloon.Service.WorkShiftService workShiftService;
 
     @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_COMMISSION_REPORT')")
     @GetMapping("/staffCommissionReport")
@@ -51,6 +52,8 @@ public class CommissionController {
     @PreAuthorize("@authChecker.hasPermissionOrRoot('PAY_COMMISSION')")
     @PostMapping("/payStaffCommission")
     public Response<CommissionPayout> payStaffCommission(@RequestBody PayCommissionDTO payCommissionDTO) {
+        // Paid from the drawer: inside the cashier's shift (CEO and above pay from anywhere).
+        workShiftService.requireOpenForPayout();
         return commissionService.payStaffCommission(
                 payCommissionDTO.getStaffUid(),
                 payCommissionDTO.getYear(),

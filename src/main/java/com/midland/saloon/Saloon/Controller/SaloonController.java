@@ -27,6 +27,7 @@ public class SaloonController {
     private final SaloonService saloonService;
     private final com.midland.saloon.Saloon.Service.InsightService insightService;
     private final com.midland.saloon.Saloon.Service.CashUpService cashUpService;
+    private final com.midland.saloon.Saloon.Service.WorkShiftService workShiftService;
     private final com.midland.saloon.Saloon.Service.StockTakeService stockTakeService;
     private final com.midland.saloon.Saloon.Service.OtherCommissionService otherCommissionService;
     private final UserService userService;
@@ -154,6 +155,7 @@ public class SaloonController {
     @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_SALES')")
     @PostMapping("/saveSaloonSales")
     public ResponseList<SaloonSales> saveSaloonSales(@RequestBody SaloonSalesDTO saloonSalesDTO){
+        workShiftService.requireOpen();
         return saloonService.saveSaloonSales(saloonSalesDTO);
     }
     @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_SALES')")
@@ -179,6 +181,7 @@ public class SaloonController {
     @PreAuthorize("@authChecker.hasPermissionOrRoot('DELETE_SALES')")
     @PostMapping("/deleteSaloonSales/{saloonSalesUID}")
     public Response<SaloonSales> deleteSaloonSales(@PathVariable String saloonSalesUID){
+        workShiftService.requireOpen();
         return saloonService.deleteSaloonSales(saloonSalesUID);
     }
     @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_SALES')")
@@ -197,6 +200,8 @@ public class SaloonController {
     @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_SALES')")
     @PostMapping("/saveOpenSale")
     public Response<SalesOpened> saveOpenSale(@RequestBody SaleOpenedDTO saleOpenedDTO){
+        // Opening a bill and taking its payment both happen inside the cashier's shift.
+        workShiftService.requireOpen();
         return saloonService.saveOpenSale(saleOpenedDTO);
     }
     @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_SALES')")
@@ -258,6 +263,7 @@ public class SaloonController {
     @PreAuthorize("@authChecker.hasPermissionOrRoot('PAY_STAFF')")
     @PostMapping("/payStaffCommission")
     public Response<StaffCommissions> payStaffCommission(@RequestBody  StaffCommissionDTO staffCommissionDTO){
+        workShiftService.requireOpenForPayout();
         return saloonService.payStaffCommission(staffCommissionDTO);
     }
     @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_REPORT')")
@@ -273,6 +279,7 @@ public class SaloonController {
     @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_EXPENSES')")
     @PostMapping("/addSpend")
     public Response<IncomeExpenses> addSpend(@RequestBody SpendDTO spendDTO) {
+        workShiftService.requireOpenForPayout();
         return saloonService.addSpend(spendDTO);
     }
     @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_EXPENSES')")
@@ -289,6 +296,7 @@ public class SaloonController {
     @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_STOCK_AND_PURCHASE')")
     @PostMapping("/payStockAndPurchase")
     public Response<StockAndPurchase> payStockAndPurchase(@RequestBody  PayStockAndPurchaseDTO payStockAndPurchaseDTO){
+        workShiftService.requireOpenForPayout();
         return saloonService.payStockAndPurchase(payStockAndPurchaseDTO);
     }
     @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_STOCK_AND_PURCHASE')")
@@ -393,6 +401,35 @@ public class SaloonController {
      CASH-UP - closing a shift. Whoever marks bills paid (SAVE_SALES) closes their
      own; the list follows VIEW_REPORT, narrowed to a cashier's own unless a manager.
      */
+    /*
+     SHIFTS (zamu) - a cashier opens one before selling and closes it to hand
+     over: the cash-up of its money and a count of the store. The list (CEO and
+     manager see everyone's, a cashier their own) follows VIEW_REPORT.
+     */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_SALES')")
+    @GetMapping("/shift/current")
+    public Response<java.util.Map<String, Object>> currentShift(){
+        return workShiftService.current();
+    }
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_SALES')")
+    @PostMapping("/shift/open")
+    public Response<com.midland.saloon.Saloon.Model.WorkShift> openShift(){
+        return workShiftService.open();
+    }
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_SALES')")
+    @PostMapping("/shift/close")
+    public Response<com.midland.saloon.Saloon.Model.WorkShift> closeShift(){
+        return workShiftService.close();
+    }
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_REPORT')")
+    @GetMapping("/shift/list/{filter}")
+    public ResponseList<java.util.Map<String, Object>> shifts(@PathVariable String filter){
+        return workShiftService.list(filter);
+    }
+
     @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_SALES')")
     @GetMapping("/cashUp/preview")
     public Response<java.util.Map<String, Object>> cashUpPreview(){

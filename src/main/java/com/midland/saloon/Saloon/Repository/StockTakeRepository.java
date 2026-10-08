@@ -15,6 +15,10 @@ public interface StockTakeRepository extends JpaRepository<StockTake, String> {
            "AND t.takenAt >= :from AND t.takenAt < :to ORDER BY t.takenAt DESC")
     List<StockTake> findTaken(@Param("branchUID") String branchUID, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
+    /** The counts taken at a shift - their loss is that shift's store loss. */
+    @Query("SELECT t FROM StockTake t WHERE t.shiftUid = :shiftUid AND t.isActive = true ORDER BY t.takenAt")
+    List<StockTake> findByShift(@Param("shiftUid") String shiftUid);
+
     @Query("SELECT t FROM StockTake t WHERE t.uid = :uid AND t.branchUid = :branchUID")
     Optional<StockTake> findInBranch(@Param("uid") String uid, @Param("branchUID") String branchUID);
 }
