@@ -97,6 +97,7 @@ public class RoleService {
             return new Response<>("Role Not Found");
         jdbcTemplate.update("DELETE FROM user_roles WHERE role_uid = ?", roleUID);
         jdbcTemplate.update("DELETE FROM role_permission WHERE role_uid = ?", roleUID);
+        com.midland.saloon.Config.Security.PrincipalCache.evictAll();
         optionalRole.get().getPermission().clear();
         roleRepository.delete(optionalRole.get());
         return new Response<>(optionalRole.get());
@@ -161,7 +162,10 @@ public class RoleService {
             }
         }
         role.setPermission(existingPermissions);
-        return new Response<>(roleRepository.save(role));
+        Role saved = roleRepository.save(role);
+        // Only the join table changed - no entity callback fires for that.
+        com.midland.saloon.Config.Security.PrincipalCache.evictAll();
+        return new Response<>(saved);
     }
     public ResponseList<String> findDistinctModules(){
         log.info(LoggerUser.getEmail() + "is accessing Modules");

@@ -10,6 +10,8 @@ import lombok.*;
 import java.time.LocalDate;
 
 @Entity
+// A change here may change who a signed-in user is - see PrincipalCache.
+@jakarta.persistence.EntityListeners(com.midland.saloon.Config.Security.PrincipalCache.Evict.class)
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter

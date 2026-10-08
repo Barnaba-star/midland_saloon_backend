@@ -100,6 +100,8 @@ public class BranchDataPurgeService {
                 deleted.put(table, n);
             }
         }
+        // Users of the branch may be gone - forget them as signed-in principals.
+        com.midland.saloon.Config.Security.PrincipalCache.evictAll();
         log.warning("Branch " + branch.getBranchCode() + " wiped: " + deleted);
         return new Response<>(deleted);
     }

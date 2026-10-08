@@ -314,6 +314,7 @@ public class UserService {
     public Response<User> deleteUser(String uid) {
         User user = userRepository.findById(uid).orElseThrow(() -> new BusinessException("User not found"));
         userRepository.deleteUserRoles(uid);
+        com.midland.saloon.Config.Security.PrincipalCache.evictAll();
         userRepository.delete(user);
         return new Response<>(user);
     }
@@ -383,7 +384,10 @@ public class UserService {
             }
         }
         user.setRoles(updatedRoles);
-        return new Response<>(userRepository.save(user));
+        User saved = userRepository.save(user);
+        // Only the join table changed - no entity callback fires for that.
+        com.midland.saloon.Config.Security.PrincipalCache.evictAll();
+        return new Response<>(saved);
     }
     // Mirrors RoleService: ROOT and DIRECTOR manage every role, everyone
     // else only ever sees/handles the branch-operational ones.
@@ -526,6 +530,8 @@ public class UserService {
         user.getExtraBranches().clear();
         user.getExtraBranches().addAll(extra);
         userRepository.save(user);
+        // Only the join table changed - no entity callback fires for that.
+        com.midland.saloon.Config.Security.PrincipalCache.evictAll();
         log.info(LoggerUser.getEmail() + " set " + user.getUsername() + " to work in " + (extra.size() + 1) + " branch(es)");
         return new Response<>(branchesOf(user));
     }

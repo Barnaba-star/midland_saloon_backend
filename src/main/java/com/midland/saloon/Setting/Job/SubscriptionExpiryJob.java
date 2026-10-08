@@ -27,6 +27,7 @@ public class SubscriptionExpiryJob {
     @Transactional // a bulk UPDATE needs one; without it the job failed every night
     public void markExpiredSubscriptions() {
         int updated = branchRepository.markExpiredSubscriptions(LocalDate.now());
+        com.midland.saloon.Config.Security.PrincipalCache.evictAll();
         if (updated > 0) {
             log.info("Marked " + updated + " branch(es) as EXPIRED");
         }

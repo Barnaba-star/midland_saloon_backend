@@ -10,6 +10,8 @@ import lombok.*;
 import java.util.stream.Stream;
 
 @Entity
+// A change here may change who a signed-in user is - see PrincipalCache.
+@jakarta.persistence.EntityListeners(com.midland.saloon.Config.Security.PrincipalCache.Evict.class)
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
