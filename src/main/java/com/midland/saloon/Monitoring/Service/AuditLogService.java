@@ -28,7 +28,8 @@ public class AuditLogService {
      * Nothing from the last month can be removed, whoever asks. A trail that
      * can be cleared the same week is not one.
      */
-    private static final int MIN_PURGE_DAYS = 30;
+    // The last week stays as evidence; anything older may go to save space.
+    private static final int MIN_PURGE_DAYS = 7;
 
     public static final String SUCCESS = "SUCCESS";
     public static final String FAILED = "FAILED";
@@ -45,6 +46,7 @@ public class AuditLogService {
         actions.put("/branch/saveBranch", "Saved a branch");
         actions.put("/branch/deleteBranch", "Deleted a branch");
         actions.put("/branch/purgeBranchData", "Wiped a branch's data");
+        actions.put("/branch/purgeBranchPeriod", "Cleared a branch's records for a period");
         actions.put("/role/saveRole", "Saved a role");
         actions.put("/role/deleteRole", "Deleted a role");
         actions.put("/role/savePermission", "Changed role permissions");

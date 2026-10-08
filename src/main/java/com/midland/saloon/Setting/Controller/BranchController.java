@@ -5,6 +5,7 @@ import com.midland.saloon.Setting.Dto.ExpiringBranchDTO;
 import com.midland.saloon.Setting.Model.Branch;
 import com.midland.saloon.Setting.Projection.BranchProjection;
 import com.midland.saloon.Setting.Service.BranchDataPurgeService;
+import com.midland.saloon.Setting.Service.BranchPeriodPurgeService;
 import com.midland.saloon.Setting.Service.BranchService;
 import java.util.Map;
 import com.midland.saloon.Uaa.Model.User;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 public class BranchController {
     private final BranchService branchService;
     private final BranchDataPurgeService branchDataPurgeService;
+    private final BranchPeriodPurgeService branchPeriodPurgeService;
 
     /**
      * Wipes a branch's working data (sales, services, stylists, store,
@@ -35,6 +37,29 @@ public class BranchController {
     public Response<Map<String, Integer>> purgeBranchData(@PathVariable String branchUID,
                                                           @RequestBody Map<String, String> body) {
         return branchDataPurgeService.purge(branchUID, body.get("confirmCode"));
+    }
+
+    /**
+     * Clears a branch's records dated from..to (yyyy-MM-dd, both included).
+     * ROOT only. {"from", "to", "dryRun": true} counts what would go;
+     * the real run also needs {"confirmCode": "<branch code>"}.
+     */
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('ROOT')")
+    @PostMapping("/purgeBranchPeriod/{branchUID}")
+    public Response<Map<String, Integer>> purgeBranchPeriod(@PathVariable String branchUID,
+                                                            @RequestBody Map<String, Object> body) {
+        return branchPeriodPurgeService.purge(branchUID,
+                parseDay(body.get("from")), parseDay(body.get("to")),
+                body.get("confirmCode") == null ? null : body.get("confirmCode").toString(),
+                Boolean.TRUE.equals(body.get("dryRun")));
+    }
+
+    private static java.time.LocalDate parseDay(Object value) {
+        try {
+            return value == null ? null : java.time.LocalDate.parse(value.toString().trim());
+        } catch (java.time.format.DateTimeParseException e) {
+            return null;
+        }
     }
 
     @PreAuthorize("@authChecker.hasPermissionOrRoot('SAVE_BRANCH')")
