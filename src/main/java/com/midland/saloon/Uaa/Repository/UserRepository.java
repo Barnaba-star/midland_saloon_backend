@@ -138,6 +138,14 @@ public interface UserRepository extends JpaRepository<User, String> {
     @Query("SELECT COUNT(DISTINCT u.uid) FROM User u JOIN u.roles r WHERE r.code = :code")
     long countRoleHolders(@Param("code") String code);
 
+    // ROOT is known across the system by the is_root flag; a root account
+    // whose ROOT role link went missing still owns the ROOT share.
+    @Query("SELECT DISTINCT u FROM User u LEFT JOIN u.roles r WHERE u.isRoot = true OR r.code = 'ROOT'")
+    List<User> findRootHolders();
+
+    @Query("SELECT COUNT(DISTINCT u.uid) FROM User u LEFT JOIN u.roles r WHERE u.isRoot = true OR r.code = 'ROOT'")
+    long countRootHolders();
+
     @Modifying
     @Query(
             value = """
