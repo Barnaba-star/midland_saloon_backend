@@ -107,7 +107,10 @@ public interface UserRepository extends JpaRepository<User, String> {
 
         b.uid AS branchUid,
         b.branchName AS branchName,
-        b.branchCode AS branchCode
+        b.branchCode AS branchCode,
+
+        (SELECT MIN(r.name) FROM User u2 JOIN u2.roles r WHERE u2.uid = u.uid) AS roleName,
+        (SELECT MIN(r.uid) FROM User u2 JOIN u2.roles r WHERE u2.uid = u.uid) AS roleUID
 
     FROM User u
     LEFT JOIN u.branch b
