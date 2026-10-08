@@ -79,8 +79,13 @@ public interface OpenStoreRepository extends JpaRepository<StoreOpen, String> {
     FROM StoreOpen o
     WHERE o.branchUid = :branchUID
       AND o.status = :searchKey
+      AND (LOWER(o.store.nameOfStore) LIKE CONCAT('%', :q, '%')
+           OR LOWER(o.openStoreCode) LIKE CONCAT('%', :q, '%')
+           OR LOWER(o.store.saloonServiceEntity.serviceName) LIKE CONCAT('%', :q, '%'))
+    ORDER BY o.createdAt DESC, o.openStoreCode DESC
 """)
-        Page<SaloonProjection> findOpenStorePage(Pageable pageable, @Param("branchUID") String branchUID, String searchKey);
+        Page<SaloonProjection> findOpenStorePage(Pageable pageable, @Param("branchUID") String branchUID,
+                                                 @Param("searchKey") String searchKey, @Param("q") String q);
 
         @Query("""
     SELECT

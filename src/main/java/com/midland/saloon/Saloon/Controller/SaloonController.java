@@ -324,14 +324,17 @@ public class SaloonController {
     @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_STORE')")
     @PostMapping("/findSaloonStorePage")
     public ResponsePage<SaloonProjection> findSaloonStorePage(@RequestBody PageableParam pageableParam){
-        return saloonService.findStorePage(pageableParam.getPage(), pageableParam.getSize());
+        // searchParam: name, code or service to look for (optional).
+        return saloonService.findStorePage(pageableParam.getPage(), pageableParam.getSize(), pageableParam.getSearchParam());
     }
 
 
     @PreAuthorize("@authChecker.hasPermissionOrRoot('VIEW_STORE')")
     @PostMapping("/findOpenStorePage")
     public ResponsePage<SaloonProjection> findOpenStorePage(@RequestBody PageableParam pageableParam){
-        return saloonService.findOpenStorePage(pageableParam.getPage(), pageableParam.getSize(), pageableParam.getSearchParam());
+        // searchParam: the status (OPEN / CLOSED); filter: name, code or service to look for.
+        return saloonService.findOpenStorePage(pageableParam.getPage(), pageableParam.getSize(),
+                pageableParam.getSearchParam(), pageableParam.getFilter());
     }
 
     @PreAuthorize("@authChecker.hasPermissionOrRoot('DELETE_STORE')")

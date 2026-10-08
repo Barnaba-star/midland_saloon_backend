@@ -49,9 +49,12 @@ public interface StoreRepository  extends JpaRepository<Store, String> {
     FROM Store s
     LEFT JOIN s.saloonServiceEntity ser
     WHERE s.branchUid = :branchUID
-   
+      AND (LOWER(s.nameOfStore) LIKE CONCAT('%', :q, '%')
+           OR LOWER(s.codeOfStore) LIKE CONCAT('%', :q, '%')
+           OR LOWER(COALESCE(ser.serviceName, '')) LIKE CONCAT('%', :q, '%'))
+    ORDER BY s.nameOfStore
 """)
-    Page<SaloonProjection> findStorePage(Pageable pageable, String branchUID);
+    Page<SaloonProjection> findStorePage(Pageable pageable, @Param("branchUID") String branchUID, @Param("q") String q);
 
     @Query("SELECT COUNT(s) FROM Store s WHERE s.branchUid = :branchUID")
     long countStores(@Param("branchUID") String branchUID);

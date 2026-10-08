@@ -2401,10 +2401,10 @@ public class SaloonService {
         log.info(LoggerUser.getEmail() + "Access saloon store");
         return new ResponseList<>(storeRepository.findStoreList(LoggerUser.getBranchUID()));
     }
-    public ResponsePage<SaloonProjection> findStorePage(Integer page, Integer size){
+    public ResponsePage<SaloonProjection> findStorePage(Integer page, Integer size, String search){
         log.info(LoggerUser.getEmail() + "Is accessing Saloon Store");
         Pageable pageable = PageRequest.of(page, size);
-        return new ResponsePage<>(storeRepository.findStorePage(pageable, LoggerUser.getBranchUID()));
+        return new ResponsePage<>(storeRepository.findStorePage(pageable, LoggerUser.getBranchUID(), like(search)));
     }
     public Response<Store> deleteSaloonStore(String storeUID){
         log.info(LoggerUser.getEmail() + "is deleting saloon store item");
@@ -2511,7 +2511,7 @@ public class SaloonService {
                 nextNumber
         );
     }
-    public ResponsePage<SaloonProjection> findOpenStorePage(Integer page, Integer size, String searchKey){
+    public ResponsePage<SaloonProjection> findOpenStorePage(Integer page, Integer size, String searchKey, String search){
         log.info(LoggerUser.getEmail() + "is Accessing Stores Open");
         if(page == null || size == null)
             return new ResponsePage<>("Either Page or Size must no be Null");
@@ -2519,7 +2519,12 @@ public class SaloonService {
         // The "search" is the status wanted (OPEN or CLOSED). Without one the
         // query matched nothing, so opened items never showed - default to OPEN.
         String status = (searchKey == null || searchKey.isBlank()) ? "OPEN" : searchKey.trim().toUpperCase();
-        return new ResponsePage<>(openStoreRepository.findOpenStorePage(pageable, LoggerUser.getBranchUID(), status));
+        return new ResponsePage<>(openStoreRepository.findOpenStorePage(pageable, LoggerUser.getBranchUID(), status, like(search)));
+    }
+
+    /** A search box's text for a LIKE: lower-case, trimmed; empty matches everything. */
+    private static String like(String search) {
+        return search == null ? "" : search.trim().toLowerCase();
     }
     public Response<StoreOpen> closeOpenStore(StoreDTO storeDTO){
         log.info(LoggerUser.getEmail() + "Is closing open store");
