@@ -4,6 +4,7 @@ import com.midland.saloon.Setting.Repository.BranchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.java.Log;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -23,6 +24,7 @@ public class SubscriptionExpiryJob {
     private final BranchRepository branchRepository;
 
     @Scheduled(cron = "0 0 1 * * *") // once a day, 01:00
+    @Transactional // a bulk UPDATE needs one; without it the job failed every night
     public void markExpiredSubscriptions() {
         int updated = branchRepository.markExpiredSubscriptions(LocalDate.now());
         if (updated > 0) {
