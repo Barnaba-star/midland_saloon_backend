@@ -29,6 +29,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AttachmentController {
 
+    private final com.midland.saloon.Config.AttachConfig.StoredFileService storedFileService;
+
     private final UserRepository userRepository;
 
     @Value("${file.upload-dir}")
@@ -80,6 +82,8 @@ public class AttachmentController {
             Path targetPath = uploadPath.resolve(storedName);
 
             Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+            // The folder is wiped by every deploy on Render's free plan; the database copy survives.
+            storedFileService.save(storedName, contentType, file.getBytes());
 
             // Best-effort cleanup of the previous photo so the uploads
             // folder doesn't accumulate an orphaned file per change.
@@ -87,6 +91,7 @@ public class AttachmentController {
             if (previousImage != null && !previousImage.isBlank()) {
                 try {
                     Files.deleteIfExists(uploadPath.resolve(previousImage));
+                    storedFileService.delete(previousImage);
                 } catch (IOException cleanupError) {
                     log.warn("Could not remove previous profile image {}", previousImage, cleanupError);
                 }

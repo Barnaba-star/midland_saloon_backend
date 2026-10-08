@@ -35,6 +35,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SystemSettingController {
 
+    private final com.midland.saloon.Config.AttachConfig.StoredFileService storedFileService;
+
     private final SystemSettingRepository systemSettingRepository;
 
     @Value("${file.upload-dir}")
@@ -105,6 +107,8 @@ public class SystemSettingController {
             Path targetPath = uploadPath.resolve(storedName);
 
             Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+            // The folder is wiped by every deploy on Render's free plan; the database copy survives.
+            storedFileService.save(storedName, contentType, file.getBytes());
 
             Optional<SystemSetting> existing = systemSettingRepository.findByBranchUid(branchUid);
 
@@ -123,6 +127,7 @@ public class SystemSettingController {
             if (previousLogo != null && !previousLogo.isBlank()) {
                 try {
                     Files.deleteIfExists(uploadPath.resolve(previousLogo));
+                    storedFileService.delete(previousLogo);
                 } catch (IOException cleanupError) {
                     log.warn("Could not remove previous logo {}", previousLogo, cleanupError);
                 }
