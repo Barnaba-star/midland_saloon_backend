@@ -54,7 +54,7 @@ public class RevenueShareService {
         long staffAmount = totals == null || totals.getTotalCommission() == null ? 0 : totals.getTotalCommission();
 
         PlatformSetting setting = platformSettingService.current();
-        int directorCount = userRepository.findAllByRoleCode(DIRECTOR_ROLE_CODE).size();
+        int directorCount = (int) userRepository.countRoleHolders(DIRECTOR_ROLE_CODE);
 
         RevenueShareDTO share = new RevenueShareDTO();
         share.setYear(period.getYear());
@@ -76,7 +76,7 @@ public class RevenueShareService {
         share.setDirectorAmount(percentOf(revenue, share.getDirectorPercent()));
 
         share.setRootPercent(orZero(setting.getRootPercent()));
-        share.setRootCount(userRepository.findAllByRoleCode(ROOT_ROLE_CODE).size());
+        share.setRootCount((int) userRepository.countRoleHolders(ROOT_ROLE_CODE));
         share.setRootAmount(percentOf(revenue, share.getRootPercent()));
 
         // Clamped at zero: percentages that add past 100 would otherwise show
@@ -138,10 +138,10 @@ public class RevenueShareService {
         }
 
         if (ROOT_ROLE_CODE.equals(wanted)) {
-            List<User> roots = userRepository.findAllByRoleCode(ROOT_ROLE_CODE);
+            long roots = userRepository.countRoleHolders(ROOT_ROLE_CODE);
             // ROOT's share is one share for the role, not one each - split it
             // rather than paying it out once per holder.
-            long each = roots.isEmpty() ? 0 : share.getRootAmount() / roots.size();
+            long each = roots == 0 ? 0 : share.getRootAmount() / roots;
             return new ResponseList<>(toRecipients(ROOT_ROLE_CODE, each, periodOf(year, month)));
         }
 
