@@ -11,8 +11,12 @@ import java.util.List;
 
 @Repository
 public interface SalesOpenedRepository extends JpaRepository<SalesOpened, String> {
-    @Query("SELECT s FROM SalesOpened s WHERE s.branchUid = :branchUID AND s.paymentStatus='PENDING' AND s.createdAt=:date ")
-    List<SalesOpened> salesOpenedList(String branchUID, LocalDate date);
+    // Every bill still waiting for payment, whatever day it was opened - a bill
+    // left from yesterday has to show here to be paid (it was counted on the
+    // dashboard but never listed). Oldest first, cancelled ones out.
+    @Query("SELECT s FROM SalesOpened s WHERE s.branchUid = :branchUID AND s.paymentStatus = 'PENDING' " +
+           "AND (s.isActive IS NULL OR s.isActive = true) ORDER BY s.createdAt, s.salesCode")
+    List<SalesOpened> salesOpenedList(@Param("branchUID") String branchUID);
     @Query("""
     SELECT s
     FROM SalesOpened s
@@ -29,13 +33,15 @@ public interface SalesOpenedRepository extends JpaRepository<SalesOpened, String
 
     // Sales still open and unpaid. Not scoped to today on purpose - a bill
     // left from last week is exactly the one worth chasing.
-    @Query("SELECT COUNT(s) FROM SalesOpened s WHERE s.branchUid = :branchUID AND s.paymentStatus = 'PENDING'")
+    @Query("SELECT COUNT(s) FROM SalesOpened s WHERE s.branchUid = :branchUID AND s.paymentStatus = 'PENDING' " +
+           "AND (s.isActive IS NULL OR s.isActive = true)")
     long countPendingBills(@Param("branchUID") String branchUID);
 
     @Query("""
             SELECT COALESCE(SUM(COALESCE(s.bill,0) - COALESCE(s.paidAmount,0)), 0)
             FROM SalesOpened s
             WHERE s.branchUid = :branchUID AND s.paymentStatus = 'PENDING'
+              AND (s.isActive IS NULL OR s.isActive = true)
             """)
     long pendingBillsAmount(@Param("branchUID") String branchUID);
 

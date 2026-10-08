@@ -601,7 +601,7 @@ public class SaloonService {
     }
     public ResponseList<SalesOpened> salesOpenedList(){
         log.info(LoggerUser.getEmail() + " Is Accessing opened Sales");
-        return new ResponseList<>(salesOpenedRepository.salesOpenedList(LoggerUser.getBranchUID(), LocalDate.now()));
+        return new ResponseList<>(salesOpenedRepository.salesOpenedList(LoggerUser.getBranchUID()));
     }
     public ResponseList<SalesOpened> salesOpenedListByStatus(String filter) {
 
