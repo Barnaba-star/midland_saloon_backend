@@ -118,6 +118,12 @@ public class ErrorLogService {
     }
 
     @Transactional
+    public Response<Integer> clearOne(String uid) {
+        int n = uid == null ? 0 : errorLogRepository.clearOne(uid);
+        return n > 0 ? new Response<>(n) : new Response<>("Error not found");
+    }
+
+    @Transactional
     public Response<Integer> clearAll() {
         return new Response<>(errorLogRepository.clearAll());
     }

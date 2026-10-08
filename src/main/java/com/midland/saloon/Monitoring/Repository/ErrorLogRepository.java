@@ -17,7 +17,8 @@ public interface ErrorLogRepository extends JpaRepository<ErrorLog, String> {
     // source and level are both optional - a null means "don't narrow on this".
     @Query("""
             SELECT e FROM ErrorLog e
-            WHERE (:source IS NULL OR e.source = :source)
+            WHERE e.isActive = true
+              AND (:source IS NULL OR e.source = :source)
               AND (:level IS NULL OR e.level = :level)
             ORDER BY e.occurredAt DESC
             """)
@@ -27,14 +28,19 @@ public interface ErrorLogRepository extends JpaRepository<ErrorLog, String> {
             Pageable pageable
     );
 
-    @Query("SELECT COUNT(e) FROM ErrorLog e WHERE e.occurredAt >= :since")
+    @Query("SELECT COUNT(e) FROM ErrorLog e WHERE e.isActive = true AND e.occurredAt >= :since")
     long countSince(@Param("since") LocalDateTime since);
 
-    // Clearing the list is a soft delete, same as everywhere else in the app -
-    // BaseEntity's @Where(is_active = true) hides them from every read above.
+    // Clearing the list is a soft delete, same as everywhere else in the app;
+    // the reads above ask for active rows only (there is no global @Where).
     @Modifying
     @Query("UPDATE ErrorLog e SET e.isActive = false, e.deletedAt = CURRENT_DATE WHERE e.isActive = true")
     int clearAll();
+
+    /** One error off the list (soft delete, like clearing them all). */
+    @Modifying
+    @Query("UPDATE ErrorLog e SET e.isActive = false, e.deletedAt = CURRENT_DATE WHERE e.uid = :uid AND e.isActive = true")
+    int clearOne(@Param("uid") String uid);
 
     @Modifying
     @Query("UPDATE ErrorLog e SET e.isActive = false, e.deletedAt = CURRENT_DATE WHERE e.isActive = true AND e.occurredAt < :cutoff")

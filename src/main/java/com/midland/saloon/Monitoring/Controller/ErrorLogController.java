@@ -37,6 +37,12 @@ public class ErrorLogController {
     }
 
     @PreAuthorize("@authChecker.hasPermissionOrRoot('DELETE_ERROR_LOG')")
+    @PostMapping("/deleteError/{uid}")
+    public Response<Integer> deleteError(@PathVariable String uid) {
+        return errorLogService.clearOne(uid);
+    }
+
+    @PreAuthorize("@authChecker.hasPermissionOrRoot('DELETE_ERROR_LOG')")
     @DeleteMapping("/clearErrors")
     public Response<Integer> clearErrors() {
         return errorLogService.clearAll();
