@@ -27,6 +27,12 @@ public interface WorkShiftRepository extends JpaRepository<WorkShift, String> {
            "AND s.status IN ('OPEN', 'CLOSED') AND (:email IS NULL OR s.cashierEmail = :email) ORDER BY s.openedAt DESC")
     List<WorkShift> findAllUnfinished(@Param("branchUID") String branchUID, @Param("email") String email);
 
+    /** This login's shifts closed since a moment, newest first - the one just handed over. */
+    @Query("SELECT s FROM WorkShift s WHERE s.branchUid = :branchUID AND s.cashierEmail = :email AND s.isActive = true " +
+           "AND s.closedAt IS NOT NULL AND s.closedAt >= :since ORDER BY s.closedAt DESC")
+    List<WorkShift> findClosedSince(@Param("branchUID") String branchUID, @Param("email") String email,
+                                    @Param("since") LocalDateTime since);
+
     /** When this login's last finished shift ended. */
     @Query("SELECT MAX(s.closedAt) FROM WorkShift s WHERE s.branchUid = :branchUID AND s.cashierEmail = :email AND s.isActive = true AND s.closedAt IS NOT NULL")
     Optional<LocalDateTime> lastClosedAt(@Param("branchUID") String branchUID, @Param("email") String email);

@@ -139,9 +139,16 @@ public class WorkShiftService {
         return unfinished(branchUID, email).filter(s -> WorkShift.CLOSED.equals(s.getStatus()));
     }
 
-    /** The shift a store count now belongs to: this login's open one, or the closed one awaiting cash-up. */
+    /**
+     * The shift a store count belongs to: this login's open one, the closed
+     * one awaiting cash-up, or - counted right after the cash-up - the one
+     * closed in the last few hours. The handover order doesn't matter.
+     */
     public Optional<WorkShift> currentForCount(String branchUID, String email) {
-        return unfinished(branchUID, email);
+        Optional<WorkShift> live = unfinished(branchUID, email);
+        if (live.isPresent() || branchUID == null || email == null)
+            return live;
+        return shiftRepository.findClosedSince(branchUID, email, LocalDateTime.now().minusHours(3)).stream().findFirst();
     }
 
     void markCashedUp(WorkShift shift, CashUp cashUp) {
