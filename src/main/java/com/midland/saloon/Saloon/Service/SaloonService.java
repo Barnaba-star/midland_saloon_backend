@@ -2516,7 +2516,10 @@ public class SaloonService {
         if(page == null || size == null)
             return new ResponsePage<>("Either Page or Size must no be Null");
         Pageable pageable = PageRequest.of(page, size);
-        return new ResponsePage<>(openStoreRepository.findOpenStorePage(pageable, LoggerUser.getBranchUID(), searchKey));
+        // The "search" is the status wanted (OPEN or CLOSED). Without one the
+        // query matched nothing, so opened items never showed - default to OPEN.
+        String status = (searchKey == null || searchKey.isBlank()) ? "OPEN" : searchKey.trim().toUpperCase();
+        return new ResponsePage<>(openStoreRepository.findOpenStorePage(pageable, LoggerUser.getBranchUID(), status));
     }
     public Response<StoreOpen> closeOpenStore(StoreDTO storeDTO){
         log.info(LoggerUser.getEmail() + "Is closing open store");
