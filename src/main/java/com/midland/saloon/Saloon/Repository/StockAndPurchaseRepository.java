@@ -106,6 +106,7 @@ public interface StockAndPurchaseRepository extends JpaRepository<StockAndPurcha
             @Param("branchUID") String branchUID
     );
 
-
-
+    /** One stock-and-purchase row with its service and commission, which paying it reads and returns. */
+    @Query("SELECT s FROM StockAndPurchase s LEFT JOIN FETCH s.saloonService LEFT JOIN FETCH s.commission WHERE s.uid = :uid")
+    Optional<StockAndPurchase> findWithServiceAndCommission(@Param("uid") String uid);
 }

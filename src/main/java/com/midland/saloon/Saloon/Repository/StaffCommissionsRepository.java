@@ -86,6 +86,7 @@ public interface StaffCommissionsRepository extends JpaRepository<StaffCommissio
             @Param("lastName") String lastName
     );
 
+    /** One staff commission with its staff member, whose name paying it writes down. */
+    @Query("SELECT s FROM StaffCommissions s LEFT JOIN FETCH s.saloonStaff WHERE s.uid = :uid")
+    Optional<StaffCommissions> findWithStaff(@Param("uid") String uid);
 }
-
-

@@ -721,6 +721,8 @@ public class SaloonService {
         // Each of the eleven buckets of every service on the sale used to look
         // its pot up with a query of its own (each forcing a flush first).
         Map<String, Map<String, IncomeExpenses>> pots = new HashMap<>();
+        // The branch's Other items, likewise read once for every service on the sale.
+        Map<String, List<OtherCommissionItem>> otherItems = new HashMap<>();
 
         /*
          * Leo
@@ -849,7 +851,8 @@ public class SaloonService {
              * OTHER
              * =========================
              */
-            addOtherIncome(amount, commission.getOtherPercent(), branchUID, weekStartDate, result, today, pots);
+            addOtherIncome(amount, commission.getOtherPercent(), branchUID, weekStartDate, result, today, pots,
+                    otherItems.computeIfAbsent(String.valueOf(branchUID), key -> otherCommissionService.activeItems(branchUID)));
 
             /*
              * =========================
@@ -939,12 +942,12 @@ public class SaloonService {
      * without one it stays the single "Other" pot it always was.
      */
     private void addOtherIncome(BigDecimal amount, Integer percent, String branchUID, LocalDate weekStartDate, List<IncomeExpenses> result, LocalDate day,
-                                Map<String, Map<String, IncomeExpenses>> pots) {
+                                Map<String, Map<String, IncomeExpenses>> pots, List<OtherCommissionItem> items) {
         if (percent == null || percent <= 0) {
             return;
         }
         BigDecimal other = amount.multiply(BigDecimal.valueOf(percent)).divide(BigDecimal.valueOf(100));
-        java.util.Map<String, BigDecimal> parts = otherCommissionService.split(other, branchUID);
+        java.util.Map<String, BigDecimal> parts = otherCommissionService.split(other, items);
         if (parts.isEmpty()) {
             addIncomeExpense("Other", amount, percent, branchUID, weekStartDate, result, pots);
             return;
@@ -2151,7 +2154,7 @@ public class SaloonService {
         StaffCommissions staffCommissions =null;
         if(staffCommissionDTO.getUid() ==null)
             return new Response<>("Weka Commission REF");
-        Optional<StaffCommissions> optionalStaffCommissions = staffCommissionsRepository.findById(staffCommissionDTO.getUid());
+        Optional<StaffCommissions> optionalStaffCommissions = staffCommissionsRepository.findWithStaff(staffCommissionDTO.getUid());
         if(optionalStaffCommissions.isEmpty())
             return new Response<>("Commission ya staff Haipo");
         staffCommissions = optionalStaffCommissions.get();
@@ -2164,7 +2167,7 @@ public class SaloonService {
         StaffCommissions savedStaffCommission = null;
         try{
             savedStaffCommission = staffCommissionsRepository.save(staffCommissions);
-            incomeExpenses = getIncomeExpensesFilter(staffCommissionDTO.getFilter(), staffCommissionDTO.getWeekDate());
+            // The pots were read just above; reading them again found the same rows.
         } catch (Exception e) {
             e.printStackTrace();
             return new Response<>("Error wakati wa kulipa");
@@ -2410,7 +2413,8 @@ public class SaloonService {
         log.info(LoggerUser.getEmail() + "is deleting saloon store item");
         if(storeUID == null)
             return new Response<>("Provide Store Item REF");
-        Optional<Store> optionalStore = storeRepository.findById(storeUID);
+        // With its service: the reply carries it, which was one more select.
+        Optional<Store> optionalStore = storeRepository.findWithService(storeUID);
         if(optionalStore.isEmpty())
             return new Response<>("Store Not Found");
         Store store = optionalStore.get();
@@ -2436,7 +2440,8 @@ public class SaloonService {
             return new Response<>("Provide Data For Adding Quantity");
         Store store= null;
         if(storeDTO.getUid() != null){
-            Optional<Store> optionalStore = storeRepository.findById(storeDTO.getUid());
+            // With its service: the reply carries it, which was one more select.
+            Optional<Store> optionalStore = storeRepository.findWithService(storeDTO.getUid());
             if(optionalStore.isEmpty())
                 return new Response<>("Store Not Found");
             store = optionalStore.get();
@@ -2468,7 +2473,8 @@ public class SaloonService {
         log.info(LoggerUser.getEmail() + "Is Opening Store for use");
         if(storeDTO.getUid() == null)
             return new Response<>("Provide Store REF");
-        Optional<Store> optionalStore = storeRepository.findById(storeDTO.getUid());
+        // With its service: the reply carries it, which was one more select.
+        Optional<Store> optionalStore = storeRepository.findWithService(storeDTO.getUid());
         if(optionalStore.isEmpty())
             return new Response<>("Store Not Found");
         StoreOpen storeOpen = new StoreOpen();
@@ -2532,7 +2538,8 @@ public class SaloonService {
             return new Response<>("Weka Taarifa za kufunga Store");
         if(storeDTO.getOpenStoreUID() == null)
             return new Response<>("Provide Open Store REF");
-        Optional<StoreOpen> optionalStoreOpen = openStoreRepository.findById(storeDTO.getOpenStoreUID());
+        // With its store item and service: the reply carries both, which were two more selects.
+        Optional<StoreOpen> optionalStoreOpen = openStoreRepository.findWithStore(storeDTO.getOpenStoreUID());
         if(optionalStoreOpen.isEmpty())
             return new Response<>("Open Store Not Found");
         StoreOpen storeOpen = optionalStoreOpen.get();
@@ -2858,7 +2865,7 @@ public class SaloonService {
         // ==============================
 
         Optional<StockAndPurchase> optionalStockAndPurchase =
-                stockAndPurchaseRepository.findById(dto.getUid());
+                stockAndPurchaseRepository.findWithServiceAndCommission(dto.getUid());
 
         if (optionalStockAndPurchase.isEmpty()) {
             return new Response<>("Pay And Stock Not Found");
@@ -3042,14 +3049,27 @@ public class SaloonService {
         if (currentUser != null && currentUser.getBranch() != null) {
             summary.setBranchName(currentUser.getBranch().getBranchName());
         }
-        summary.setTodayRevenue(saloonReportsRepository.totalRevenueOn(branchUID, today));
-        summary.setYesterdayRevenue(saloonReportsRepository.totalRevenueOn(branchUID, today.minusDays(1)));
-        summary.setServicesSoldToday(saloonReportsRepository.countServicesSoldOn(branchUID, today));
-        summary.setPendingBillsCount(salesOpenedRepository.countPendingBills(branchUID));
-        summary.setPendingBillsAmount(salesOpenedRepository.pendingBillsAmount(branchUID));
-        summary.setOpenStores(openStoreRepository.countOpenStores(branchUID));
-        summary.setTotalStores(storeRepository.countStores(branchUID));
+        // Three selects for the seven figures (it was seven) - this is the home screen.
+        Object[] reports = first(saloonReportsRepository.dashboardFigures(branchUID, today, today.minusDays(1)), 3);
+        summary.setTodayRevenue(asLong(reports[0]));
+        summary.setYesterdayRevenue(asLong(reports[1]));
+        summary.setServicesSoldToday(asLong(reports[2]));
+        Object[] pending = first(salesOpenedRepository.pendingBills(branchUID), 2);
+        summary.setPendingBillsCount(asLong(pending[0]));
+        summary.setPendingBillsAmount(asLong(pending[1]));
+        Object[] stores = first(storeRepository.storeCounts(branchUID), 2);
+        summary.setOpenStores(asLong(stores[0]));
+        summary.setTotalStores(asLong(stores[1]));
         return new Response<>(summary);
+    }
+
+    /** The single row of an aggregate select (zeros when there is none). */
+    private static Object[] first(List<Object[]> rows, int columns) {
+        return rows == null || rows.isEmpty() || rows.get(0) == null ? new Object[columns] : rows.get(0);
+    }
+
+    private static long asLong(Object value) {
+        return value instanceof Number n ? n.longValue() : 0L;
     }
 
     /**

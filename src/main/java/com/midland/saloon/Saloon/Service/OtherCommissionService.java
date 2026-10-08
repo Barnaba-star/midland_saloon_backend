@@ -99,8 +99,17 @@ public class OtherCommissionService {
      * Empty when the branch has not set any - the caller keeps one Other pot.
      */
     public Map<String, BigDecimal> split(BigDecimal otherAmount, String branchUID) {
+        return split(otherAmount, activeItems(branchUID));
+    }
+
+    /** The branch's Other items - read once by a caller that splits several amounts. */
+    public List<OtherCommissionItem> activeItems(String branchUID) {
+        return repository.findActive(branchUID);
+    }
+
+    /** As split(amount, branch), over items the caller already has. */
+    public Map<String, BigDecimal> split(BigDecimal otherAmount, List<OtherCommissionItem> list) {
         Map<String, BigDecimal> parts = new LinkedHashMap<>();
-        List<OtherCommissionItem> list = repository.findActive(branchUID);
         if (list.isEmpty() || otherAmount == null)
             return parts;
         BigDecimal given = BigDecimal.ZERO;

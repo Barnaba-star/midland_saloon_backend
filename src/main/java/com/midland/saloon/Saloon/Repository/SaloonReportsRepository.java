@@ -286,18 +286,27 @@ public interface SaloonReportsRepository extends JpaRepository<SaloonReports, St
 
     // A service's price is split eleven ways across these columns, so the
     // branch's revenue is their sum - the same total the revenue report shows.
+    // The dashboard's three report figures in one pass over two days of rows:
+    // [today's revenue, yesterday's revenue, services sold today].
     @Query("""
-            SELECT COALESCE(SUM(COALESCE(r.traAmount,0) + COALESCE(r.ownerAmount,0) + COALESCE(r.staffAmount,0)
+            SELECT
+              COALESCE(SUM(CASE WHEN r.createdAt = :today THEN
+                   COALESCE(r.traAmount,0) + COALESCE(r.ownerAmount,0) + COALESCE(r.staffAmount,0)
                  + COALESCE(r.emergencyAmount,0) + COALESCE(r.othersAmount,0) + COALESCE(r.loanAmount,0)
                  + COALESCE(r.rentAmount,0) + COALESCE(r.waterAmount,0) + COALESCE(r.lukuAmount,0)
-                 + COALESCE(r.stockPurchaseAmount,0) + COALESCE(r.maintenanceAmount,0)), 0)
+                 + COALESCE(r.stockPurchaseAmount,0) + COALESCE(r.maintenanceAmount,0) ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN r.createdAt = :yesterday THEN
+                   COALESCE(r.traAmount,0) + COALESCE(r.ownerAmount,0) + COALESCE(r.staffAmount,0)
+                 + COALESCE(r.emergencyAmount,0) + COALESCE(r.othersAmount,0) + COALESCE(r.loanAmount,0)
+                 + COALESCE(r.rentAmount,0) + COALESCE(r.waterAmount,0) + COALESCE(r.lukuAmount,0)
+                 + COALESCE(r.stockPurchaseAmount,0) + COALESCE(r.maintenanceAmount,0) ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN r.createdAt = :today THEN 1 ELSE 0 END), 0)
             FROM SaloonReports r
-            WHERE r.branchUid = :branchUID AND r.createdAt = :date
+            WHERE r.branchUid = :branchUID AND r.createdAt >= :yesterday AND r.createdAt <= :today
             """)
-    long totalRevenueOn(@Param("branchUID") String branchUID, @Param("date") LocalDate date);
-
-    @Query("SELECT COUNT(r) FROM SaloonReports r WHERE r.branchUid = :branchUID AND r.createdAt = :date")
-    long countServicesSoldOn(@Param("branchUID") String branchUID, @Param("date") LocalDate date);
+    List<Object[]> dashboardFigures(@Param("branchUID") String branchUID,
+                                    @Param("today") LocalDate today,
+                                    @Param("yesterday") LocalDate yesterday);
 
     // One row per day for the home page's trend line. Days with no sales are
     // simply absent - the caller fills those in as zero so the line stays

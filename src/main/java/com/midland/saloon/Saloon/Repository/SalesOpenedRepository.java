@@ -33,17 +33,14 @@ public interface SalesOpenedRepository extends JpaRepository<SalesOpened, String
 
     // Sales still open and unpaid. Not scoped to today on purpose - a bill
     // left from last week is exactly the one worth chasing.
-    @Query("SELECT COUNT(s) FROM SalesOpened s WHERE s.branchUid = :branchUID AND s.paymentStatus = 'PENDING' " +
-           "AND (s.isActive IS NULL OR s.isActive = true)")
-    long countPendingBills(@Param("branchUID") String branchUID);
-
+    // [how many, how much still owed] - one select for both dashboard figures.
     @Query("""
-            SELECT COALESCE(SUM(COALESCE(s.bill,0) - COALESCE(s.paidAmount,0)), 0)
+            SELECT COUNT(s), COALESCE(SUM(COALESCE(s.bill,0) - COALESCE(s.paidAmount,0)), 0)
             FROM SalesOpened s
             WHERE s.branchUid = :branchUID AND s.paymentStatus = 'PENDING'
               AND (s.isActive IS NULL OR s.isActive = true)
             """)
-    long pendingBillsAmount(@Param("branchUID") String branchUID);
+    List<Object[]> pendingBills(@Param("branchUID") String branchUID);
 
     /** One cashier's takings in [from, to): method, amount, bills - what their cash-up expects. */
     @Query("SELECT LOWER(s.paymentMethod), COALESCE(SUM(s.paidAmount), 0), COUNT(s) FROM SalesOpened s " +

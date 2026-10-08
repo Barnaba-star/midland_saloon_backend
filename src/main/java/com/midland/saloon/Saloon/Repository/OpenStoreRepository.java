@@ -153,6 +153,7 @@ public interface OpenStoreRepository extends JpaRepository<StoreOpen, String> {
                 @Param("serviceUID") String serviceUID
         );
 
-        @Query("SELECT COUNT(o) FROM StoreOpen o WHERE o.branchUid = :branchUID AND o.status = 'OPEN'")
-        long countOpenStores(@Param("branchUID") String branchUID);
+        /** One opened item with its store item and service - all of what its JSON carries - in one select. */
+        @Query("SELECT o FROM StoreOpen o LEFT JOIN FETCH o.store s LEFT JOIN FETCH s.saloonServiceEntity WHERE o.uid = :uid")
+        Optional<StoreOpen> findWithStore(@Param("uid") String uid);
 }

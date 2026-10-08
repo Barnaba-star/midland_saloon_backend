@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface StoreRepository  extends JpaRepository<Store, String> {
@@ -56,8 +57,12 @@ public interface StoreRepository  extends JpaRepository<Store, String> {
 """)
     Page<SaloonProjection> findStorePage(Pageable pageable, @Param("branchUID") String branchUID, @Param("q") String q);
 
-    @Query("SELECT COUNT(s) FROM Store s WHERE s.branchUid = :branchUID")
-    long countStores(@Param("branchUID") String branchUID);
+    /** [store items opened for use, store items] - the dashboard's store figures in one select. */
+    @Query("""
+            SELECT (SELECT COUNT(o) FROM StoreOpen o WHERE o.branchUid = :branchUID AND o.status = 'OPEN'), COUNT(s)
+            FROM Store s WHERE s.branchUid = :branchUID
+            """)
+    List<Object[]> storeCounts(@Param("branchUID") String branchUID);
 
     /** Every active store item of the branch - what a stock take goes through. */
     @org.springframework.data.jpa.repository.Query("SELECT s FROM Store s WHERE s.branchUid = :branchUID AND s.isActive = true ORDER BY s.nameOfStore")
@@ -68,4 +73,8 @@ public interface StoreRepository  extends JpaRepository<Store, String> {
     @org.springframework.data.jpa.repository.Query("SELECT s FROM Store s WHERE s.uid = :uid AND s.branchUid = :branchUID")
     java.util.Optional<Store> findForUpdate(@org.springframework.data.repository.query.Param("uid") String uid,
                                             @org.springframework.data.repository.query.Param("branchUID") String branchUID);
+
+    /** One store item with its service - what the JSON of a store item carries - in one select. */
+    @Query("SELECT s FROM Store s LEFT JOIN FETCH s.saloonServiceEntity WHERE s.uid = :uid")
+    Optional<Store> findWithService(@Param("uid") String uid);
 }
